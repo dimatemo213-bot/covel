@@ -246,7 +246,6 @@ export function AiWorldGenerator({
             ...(additionalInstructions.trim()
               ? { additionalInstructions: additionalInstructions.trim() }
               : {}),
-            nsfwEnabled,
           },
         },
       );
