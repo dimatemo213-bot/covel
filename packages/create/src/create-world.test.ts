@@ -1306,9 +1306,10 @@ describe("buildWorldPrompt", () => {
     expect(prompt).toContain(
       "Technical vocabulary is allowed when it belongs to the fictional setting",
     );
-    expect(prompt).toContain("Do not create player goals, objectives, quests, missions, or a numbered adventure-hook list.");
+    expect(prompt).toContain("Do not assign the player goals, objectives, quests, missions, or required courses of action.");
+    expect(prompt).toContain("Include 3 numbered adventure hooks as optional, open-ended opportunities.");
     expect(prompt).toContain(
-      "Opening choices must revolve around the same current crisis or pressure mechanism without assigning the player a goal or required course of action.",
+      "The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism, but remain optional opportunities rather than assigned player goals or required tasks.",
     );
   });
 
@@ -1330,7 +1331,7 @@ describe("buildWorldPrompt", () => {
     );
     expect(prompt).toContain("Include 3 numbered adventure hooks");
     expect(prompt).toContain("The opening choices and all 3 adventure hooks");
-    expect(prompt).not.toContain("Do not create player goals");
+    expect(prompt).not.toContain("Do not assign the player goals");
   });
 
   it("shows dimension definitions without an ID that a model can copy", async () => {
