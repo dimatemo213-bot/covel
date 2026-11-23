@@ -351,16 +351,22 @@ function parseCreationBrief(
 function withGeneratedPackageMetadata(
   record: WorldRecord,
   packageContent: GeneratedWorldPackageContent | undefined,
+  nsfwEnabled?: boolean,
 ): WorldRecord {
   if (!packageContent) return record;
   const embeddedLorebook = [
     ...packageContent.lorebook,
     ...packageContent.rules,
   ];
+  const adultModeLore = nsfwEnabled === true
+    ? `${record.lore ?? ""}${record.lore?.trim() ? "\\n\\n" : ""}<!-- narrator-only -->\\nNSFW mode is enabled for this world. Adult themes, romance, and consensual intimate situations may occur only between clearly adult characters (18+). Keep all characters under 18 entirely outside sexual or erotic content. Respect consent and do not eroticize coercion or exploitation.<!-- /narrator-only -->`
+    : record.lore;
   return {
     ...record,
+    ...(adultModeLore !== undefined ? { lore: adultModeLore } : {}),
     metadata: {
       ...record.metadata,
+      ...(typeof nsfwEnabled === "boolean" ? { nsfwEnabled } : {}),
       dimensions: packageContent.dimensions,
       ...(packageContent.contractData?.length
         ? { contractData: packageContent.contractData }
@@ -410,6 +416,10 @@ aiRoutes.post(
       c.get("pluginRegistry"),
       (message) => contractWarnings.push(message),
     );
+    if (body.nsfwEnabled !== undefined && typeof body.nsfwEnabled !== "boolean") {
+      return c.json(errorBody("nsfwEnabled must be a boolean"), 400);
+    }
+    const nsfwEnabled = body.nsfwEnabled === true;
     const brief = parseCreationBrief(
       body.brief,
       dataContracts.map((item) => item.contract),
@@ -497,6 +507,7 @@ aiRoutes.post(
           const generated = withGeneratedPackageMetadata(
             loaded,
             result.packageContent,
+            nsfwEnabled,
           );
           return saveTarget === "server-file"
             ? generated
