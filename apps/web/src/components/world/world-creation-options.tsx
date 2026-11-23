@@ -25,11 +25,13 @@ interface WorldCreationOptionsProps {
   pluginContent: readonly GeneratableWorldContent[];
   contracts: ReadonlySet<string>;
   additionalInstructions: string;
+  nsfwEnabled: boolean;
   disabled: boolean;
   onPackChange: (pack: string) => void;
   onToggleContent: (kind: WorldPackageContentKind) => void;
   onToggleContract: (contract: string) => void;
   onAdditionalInstructionsChange: (value: string) => void;
+  onNsfwEnabledChange: (enabled: boolean) => void;
 }
 
 const CONTENT_OPTIONS: ReadonlyArray<{
@@ -72,11 +74,13 @@ export function WorldCreationOptions({
   pluginContent,
   contracts,
   additionalInstructions,
+  nsfwEnabled,
   disabled,
   onPackChange,
   onToggleContent,
   onToggleContract,
   onAdditionalInstructionsChange,
+  onNsfwEnabledChange,
 }: WorldCreationOptionsProps) {
   return (
     <section className="rounded-(--radius-card) border border-border bg-muted/20 p-4">
@@ -175,6 +179,26 @@ export function WorldCreationOptions({
           </div>
         </div>
       )}
+
+      <div className="mt-4 flex items-center justify-between gap-3 rounded-(--radius-control) border border-border bg-background/70 px-3 py-3">
+        <div className="min-w-0">
+          <p className="text-xs font-medium">{t("world.aiNsfwLabel", "NSFW mode")}</p>
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted-foreground">
+            {t("world.aiNsfwDescription", "Allows mature themes and intimacy between adult characters.")}
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={nsfwEnabled}
+          aria-label={t("world.aiNsfwLabel", "NSFW mode")}
+          disabled={disabled}
+          onClick={() => onNsfwEnabledChange(!nsfwEnabled)}
+          className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${nsfwEnabled ? "bg-primary" : "bg-muted"}`}
+        >
+          <span className={`inline-block h-4 w-4 rounded-full bg-white shadow transition-transform ${nsfwEnabled ? "translate-x-6" : "translate-x-1"}`} />
+        </button>
+      </div>
 
       <div className="mt-4">
         <div className="flex items-center justify-between gap-3">

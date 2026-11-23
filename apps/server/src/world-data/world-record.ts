@@ -27,6 +27,7 @@ export function worldRecordFromManifest(
     ...(isLocaleMap(manifest.summary) ? { description: manifest.summary } : {}),
   };
   const packageInfo = packageInfoOf(manifest);
+  const nsfwEnabled = manifest.nsfwEnabled === true;
   return {
     id: manifest.id as string,
     name:
@@ -44,6 +45,7 @@ export function worldRecordFromManifest(
     locale,
     metadata: {
       plugins: manifest.plugins,
+      ...(typeof manifest.nsfwEnabled === "boolean" ? { nsfwEnabled } : {}),
       pluginPitch: manifest.pluginPitch,
       pluginSettings: manifest.pluginSettings,
       worldDataPath: manifest.worldData,

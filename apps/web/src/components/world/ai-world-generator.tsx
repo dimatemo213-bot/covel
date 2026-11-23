@@ -76,6 +76,7 @@ export function AiWorldGenerator({
     () => new Set(),
   );
   const [additionalInstructions, setAdditionalInstructions] = useState("");
+  const [nsfwEnabled, setNsfwEnabled] = useState(false);
   const [phase, setPhase] = useState<WorldGenerationPhase>("idle");
   const [error, setError] = useState<string | null>(null);
   const [errorCode, setErrorCode] = useState<GenerateWorldError["code"]>();
@@ -96,6 +97,7 @@ export function AiWorldGenerator({
     setContent(new Set(DEFAULT_CONTENT));
     setContracts(defaultContracts(pluginContent));
     setAdditionalInstructions("");
+    setNsfwEnabled(false);
   }, [packs, pluginContent]);
 
   useEffect(
@@ -236,6 +238,7 @@ export function AiWorldGenerator({
           saveTarget: generatedWorldSaveTargetForStorageMode(
             storageModeForServerStorage(health.storage),
           ),
+          nsfwEnabled,
           brief: {
             ...(pack ? { pack } : {}),
             content: [...content],
@@ -253,6 +256,7 @@ export function AiWorldGenerator({
     }
   }, [
     additionalInstructions,
+    nsfwEnabled,
     content,
     contracts,
     i18n.language,
@@ -464,6 +468,8 @@ export function AiWorldGenerator({
               pluginContent={pluginContent}
               contracts={contracts}
               additionalInstructions={additionalInstructions}
+              nsfwEnabled={nsfwEnabled}
+              onNsfwEnabledChange={setNsfwEnabled}
               disabled={isWorking || phase === "done"}
               onPackChange={setPack}
               onToggleContent={toggleContent}

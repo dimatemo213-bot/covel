@@ -360,6 +360,7 @@ export function generateWorld(
   options?: {
     saveTarget?: GeneratedWorldSaveTarget;
     brief?: WorldCreationBrief;
+    nsfwEnabled?: boolean;
   },
 ): AbortController {
   const controller = new AbortController();
@@ -373,6 +374,7 @@ export function generateWorld(
           locale,
           saveTarget: options?.saveTarget,
           brief: options?.brief,
+          nsfwEnabled: options?.nsfwEnabled ?? false,
           idleTimeoutMs: authoringIdleTimeoutMs(),
         }),
         signal: controller.signal,

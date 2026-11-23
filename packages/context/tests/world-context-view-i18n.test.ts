@@ -53,6 +53,30 @@ describe("buildWorldContextView frozen dimensions", () => {
     expect(current.name).toBe("W");
     expect(current.tags).toEqual(["fog"]);
   });
+  it("passes enabled NSFW mode to the narrator without changing world lore", () => {
+    const worldRecord = {
+      id: "w1",
+      name: "W",
+      description: "Summary",
+      lore: "Authored world lore.",
+      metadata: { nsfwEnabled: true },
+      createdAt: "2026-01-01T00:00:00Z",
+    };
+    const current = buildWorldContextView({
+      worldRecord,
+      schemaMap: undefined,
+      entriesMap: undefined,
+      dimensions: {},
+      locale: "en-US",
+    });
+
+    expect(current.lore).toBe("Authored world lore.");
+    expect(current.extra).toMatchObject({
+      nsfwEnabled: true,
+      narrativeModeInstructions: expect.stringContaining("clearly adult characters (18+)"),
+    });
+  });
+
   it("projects stored values as they are, whatever the request language", () => {
     for (const locale of ["zh-CN", "ja-JP"]) {
       const projection = projectDimensionSnapshot(

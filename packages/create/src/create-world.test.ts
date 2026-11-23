@@ -1306,9 +1306,32 @@ describe("buildWorldPrompt", () => {
     expect(prompt).toContain(
       "Technical vocabulary is allowed when it belongs to the fictional setting",
     );
+    expect(prompt).toContain("Do not assign the player goals, objectives, quests, missions, or required courses of action.");
+    expect(prompt).toContain("Include 3 numbered adventure hooks as optional, open-ended opportunities.");
     expect(prompt).toContain(
-      "The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism.",
+      "The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism, but remain optional opportunities rather than assigned player goals or required tasks.",
     );
+  });
+
+  it("keeps adventure hooks available when revising an existing world", async () => {
+    const prompt = await buildWorldPrompt(
+      "Revise the setting",
+      "en-US",
+      undefined,
+      undefined,
+      [],
+      [],
+      {
+        current: {
+          yaml: 'name: "Existing World"\\nsummary: "A world."\\ndefaultLocale: "en-US"',
+          lore: "# Existing World\\nExisting lore.",
+        },
+        instruction: "Add a new faction.",
+      },
+    );
+    expect(prompt).toContain("Include 3 numbered adventure hooks");
+    expect(prompt).toContain("The opening choices and all 3 adventure hooks");
+    expect(prompt).not.toContain("Do not assign the player goals");
   });
 
   it("shows dimension definitions without an ID that a model can copy", async () => {

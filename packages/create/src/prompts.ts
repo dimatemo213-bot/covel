@@ -40,6 +40,12 @@ export async function buildWorldPrompt(
     concept,
     locale: promptLocale.locale,
     language: promptLocale.language,
+    worldHooksInstruction: revision
+      ? "Include 3 numbered adventure hooks, each on its own line, starting with 1., 2., and 3. They must revolve around the same current crisis."
+      : "Include 3 numbered adventure hooks as optional, open-ended opportunities. Do not assign the player goals, objectives, quests, missions, or required courses of action.",
+    openingHookInstruction: revision
+      ? "The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism."
+      : "The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism, but remain optional opportunities rather than assigned player goals or required tasks.",
     creationBrief: revision
       ? [
           "This is a revision of the existing world, not a new creation brief. Keep omitted fields, lists and records; UNCHANGED preserves a section. Apply only the author's requested changes. Do not apply creation quantities or empty-array defaults.",

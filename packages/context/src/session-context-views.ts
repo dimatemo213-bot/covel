@@ -56,6 +56,14 @@ export function buildWorldContextView(input: BuildViewInput): WorldContextView {
     }
   }
 
+  // World-level adult-content mode is passed as an explicit narrator
+  // instruction, without mutating the authored lore (which revisions reuse).
+  if (metadata?.nsfwEnabled === true) {
+    extra = extra ?? {};
+    extra.narrativeModeInstructions =
+      "NSFW mode is enabled. Adult themes, romance, and consensual intimate situations may occur only between clearly adult characters (18+). Keep all characters under 18 entirely outside sexual or erotic content. Respect consent and do not eroticize coercion or exploitation.";
+  }
+
   return {
     id,
     // The session's language, when the world ships that translation.

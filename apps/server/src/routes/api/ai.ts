@@ -351,6 +351,7 @@ function parseCreationBrief(
 function withGeneratedPackageMetadata(
   record: WorldRecord,
   packageContent: GeneratedWorldPackageContent | undefined,
+  nsfwEnabled?: boolean,
 ): WorldRecord {
   if (!packageContent) return record;
   const embeddedLorebook = [
@@ -361,6 +362,7 @@ function withGeneratedPackageMetadata(
     ...record,
     metadata: {
       ...record.metadata,
+      ...(typeof nsfwEnabled === "boolean" ? { nsfwEnabled } : {}),
       dimensions: packageContent.dimensions,
       ...(packageContent.contractData?.length
         ? { contractData: packageContent.contractData }
@@ -410,6 +412,10 @@ aiRoutes.post(
       c.get("pluginRegistry"),
       (message) => contractWarnings.push(message),
     );
+    if (body.nsfwEnabled !== undefined && typeof body.nsfwEnabled !== "boolean") {
+      return c.json(errorBody("nsfwEnabled must be a boolean"), 400);
+    }
+    const nsfwEnabled = body.nsfwEnabled === true;
     const brief = parseCreationBrief(
       body.brief,
       dataContracts.map((item) => item.contract),
@@ -489,6 +495,8 @@ aiRoutes.post(
 
         await send({ type: "progress", phase: "validating" });
 
+        const generatedManifest = { ...result.manifest, nsfwEnabled };
+        const generatedResult = { ...result, manifest: generatedManifest };
         const metadata = {
           source: saveTarget === "server-file" ? "generated-file" : "generated",
           storage: storageMetadata(saveTarget, env.storeBackend, worldsDir),
@@ -497,6 +505,7 @@ aiRoutes.post(
           const generated = withGeneratedPackageMetadata(
             loaded,
             result.packageContent,
+            nsfwEnabled,
           );
           return saveTarget === "server-file"
             ? generated
@@ -520,7 +529,7 @@ aiRoutes.post(
           };
           if (saveTarget === "server-file") {
             let record!: WorldRecord;
-            await writeWorldPackage(worldsDir, result, {
+            await writeWorldPackage(worldsDir, generatedResult, {
               dataContracts,
               beforePublish: async (staging) => {
                 record = makeRecord(
@@ -533,7 +542,7 @@ aiRoutes.post(
             return record;
           }
           const record = makeRecord(
-            worldRecordFromManifest(result.manifest, result.lore, {
+            worldRecordFromManifest(generatedManifest, result.lore, {
               ...metadata,
               ...(result.packageContent.characters.length
                 ? { embeddedCharacters: result.packageContent.characters }
