@@ -1137,12 +1137,6 @@ function withGeneratedPackageMetadata(
     ...packageContent.lorebook,
     ...packageContent.rules,
   ];
-  const adultModeLore =
-    nsfwEnabled === true
-      ? `${record.lore ?? ""}${record.lore?.trim() ? "\\n\\n" : ""}<!-- narrator-only -->
-NSFW mode is enabled for this world. Adult themes, romance, and consensual intimate situations may occur only between clearly adult characters (18+). Keep all characters under 18 entirely outside sexual or erotic content. Respect consent and do not eroticize coercion or exploitation.
-<!-- /narrator-only -->`
-      : record.lore;
   return {
     ...record,
     ...(adultModeLore !== undefined ? { lore: adultModeLore } : {}),
