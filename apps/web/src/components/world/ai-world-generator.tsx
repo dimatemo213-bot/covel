@@ -238,6 +238,7 @@ export function AiWorldGenerator({
           saveTarget: generatedWorldSaveTargetForStorageMode(
             storageModeForServerStorage(health.storage),
           ),
+          nsfwEnabled,
           brief: {
             ...(pack ? { pack } : {}),
             content: [...content],
