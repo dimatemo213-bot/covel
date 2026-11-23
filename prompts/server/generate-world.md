@@ -65,7 +65,7 @@ The player reads WORLD.md too. The narrator reads all of it.
 Write what the player must not know yet in a narrator-only block: hidden plotlines, the truth behind a mystery, and how to run the story.
 A narrator-only block starts with the line `<!-- narrator-only -->` and ends with the line `<!-- /narrator-only -->`.
 Each of the two lines must have nothing else on it.
-Keep the H1 and setting overview outside the block; keep adventure hooks outside only when the applicable authoring guidance requests them.
+Keep the H1, setting overview and adventure hooks outside the block.
 
 ## WORLD_PACKAGE_YAML
 
