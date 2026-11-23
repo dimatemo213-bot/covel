@@ -58,14 +58,14 @@ plugins:
 
 Write 180-350 words of focused lore.
 Start with exactly one H1: "# <world name>".
-Include setting overview, factions, power system, daily life, and 3 numbered adventure hooks. Put each hook on its own line, starting with `1. `, `2. `, and `3. ` respectively.
+Include the setting overview, factions, power system, and daily life. Do not create player goals, objectives, quests, missions, or a numbered adventure-hook list. The world should provide an open setting in which the player chooses their own direction.
 Anchor the lore around one core anomaly or pressure mechanism that makes this world distinctive.
 
 The player reads WORLD.md too. The narrator reads all of it.
 Write what the player must not know yet in a narrator-only block: hidden plotlines, the truth behind a mystery, and how to run the story.
 A narrator-only block starts with the line `<!-- narrator-only -->` and ends with the line `<!-- /narrator-only -->`.
 Each of the two lines must have nothing else on it.
-Keep the H1, the setting overview and the adventure hooks outside the block.
+Keep the H1 and setting overview outside the block.
 
 ## WORLD_PACKAGE_YAML
 
@@ -164,6 +164,6 @@ rules:
 - Be creative and specific. Avoid generic fantasy tropes.
 - Never expose the generation process or describe world content as a test fixture, prompt/model output, evaluation artifact, or framework implementation example. Technical vocabulary is allowed when it belongs to the fictional setting.
 - Avoid literal generic names built only from genre nouns. Coin proper nouns with a local cultural or historical reason.
-- The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism.
+- The opening choices must revolve around the same current crisis or pressure mechanism, without assigning the player a goal or required course of action.
 - The dimension that holds the opening choices must present an immediate choice or tension tied to that crisis.
 - Do NOT output anything except the delimited sections that the request names.
