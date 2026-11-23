@@ -29,7 +29,7 @@ export function worldRecordFromManifest(
   const packageInfo = packageInfoOf(manifest);
   const nsfwEnabled = manifest.nsfwEnabled === true;
   const worldLore = nsfwEnabled
-    ? `${lore}${lore.trim() ? "\\n\\n" : ""}<!-- narrator-only -->\\nNSFW mode is enabled for this world. Adult themes, romance, and consensual intimate situations may occur only between clearly adult characters (18+). Keep all characters under 18 entirely outside sexual or erotic content. Respect consent and do not eroticize coercion or exploitation.\\n<!-- /narrator-only -->`
+    ? `${lore}${lore.trim() ? "\n\n" : ""}<!-- narrator-only -->\nNSFW mode is enabled for this world. Adult themes, romance, and consensual intimate situations may occur only between clearly adult characters (18+). Keep all characters under 18 entirely outside sexual or erotic content. Respect consent and do not eroticize coercion or exploitation.\n<!-- /narrator-only -->`
     : lore;
   return {
     id: manifest.id as string,
