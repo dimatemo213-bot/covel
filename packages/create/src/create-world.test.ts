@@ -1306,8 +1306,9 @@ describe("buildWorldPrompt", () => {
     expect(prompt).toContain(
       "Technical vocabulary is allowed when it belongs to the fictional setting",
     );
+    expect(prompt).toContain("Do not create player goals, objectives, quests, missions, or a numbered adventure-hook list.");
     expect(prompt).toContain(
-      "The opening choices and all 3 adventure hooks must revolve around the same current crisis or pressure mechanism.",
+      "Opening choices must revolve around the same current crisis or pressure mechanism without assigning the player a goal or required course of action.",
     );
   });
 
