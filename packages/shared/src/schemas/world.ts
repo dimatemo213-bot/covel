@@ -457,6 +457,7 @@ export const worldManifestSchema = z
     summary: i18nTextSchema.describe(
       "One or two sentences shown on the world card.",
     ),
+    nsfwEnabled: z.boolean().describe("Whether mature themes between adult characters are enabled for this world.").optional(),
     defaultLocale: localeCodeSchema.meta({
       description:
         "Default content locale as a BCP 47 tag. A session uses it when the request sets no locale.",
