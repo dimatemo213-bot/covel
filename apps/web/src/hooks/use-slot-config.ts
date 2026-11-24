@@ -262,6 +262,14 @@ export function useSlotConfig(
           ? getSettings().get<string>(`keys.${provider}`)
           : undefined;
         if (localKey?.trim()) return true;
+        // URV is an iframe-backed browser provider, not an authenticated HTTP
+        // service. Its requests are executed by the Perchance bridge and need
+        // no provider API key, so credential readiness must not block startup.
+        const providerBaseUrl = slot.preset?.baseUrl ?? llmConfig?.slots[slot.slotId]?.baseUrl;
+        if (
+          provider === "urv" &&
+          providerBaseUrl?.replace(/\/$/, "") === "https://perchance.org/urv-ai-chat"
+        ) return true;
         if (slot.preset?.scope === "custom") {
           // The registry checked this exact endpoint/protocol as request-scoped.
           // A server slot's preset override is not a trusted provider default.
