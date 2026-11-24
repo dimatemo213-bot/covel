@@ -136,8 +136,7 @@ export function relayRefusal(
   );
   const isUrv =
     target.origin === "https://perchance.org" &&
-    target.pathname.startsWith(URV_PATH_PREFIX) &&
-    (target.pathname.endsWith("/v1/chat/completions") || target.pathname.endsWith("/v1/models"));
+    (target.pathname === `${URV_PATH_PREFIX}v1/chat/completions` ||\n      target.pathname === `${URV_PATH_PREFIX}v1/models`);
   if (!configured || (!isLocalNetworkBaseUrl(target.href) && !isUrv)) {
     return `this browser relays only to the model endpoints you added in Settings on your computer or local network, and ${target.origin} is not one of them.`;
   }
@@ -218,16 +217,16 @@ async function createUrvResponse(event: RelayRequestEvent, signal: AbortSignal):
   const target = new URL(event.url);
   if (
     target.origin !== "https://perchance.org" ||
-    !target.pathname.startsWith(URV_PATH_PREFIX)
+    (target.pathname !== `${URV_PATH_PREFIX}v1/models` &&\n      target.pathname !== `${URV_PATH_PREFIX}v1/chat/completions`)
   ) return undefined;
 
-  if (target.pathname.endsWith("/v1/models")) {
+  if (target.pathname === `${URV_PATH_PREFIX}v1/models`) {
     return Response.json({
       object: "list",
       data: [{ id: "default", object: "model", owned_by: "perchance" }],
     });
   }
-  if (!target.pathname.endsWith("/v1/chat/completions")) return undefined;
+  if (target.pathname !== `${URV_PATH_PREFIX}v1/chat/completions`) return undefined;
 
   let body: Record<string, unknown>;
   try {
