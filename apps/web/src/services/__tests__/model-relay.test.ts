@@ -85,11 +85,13 @@ describe("relayEndpoints and the channel header", () => {
   it("allows the configured URV Perchance chat and model-list paths only", () => {
     const urvEndpoint = new URL("https://perchance.org/urv-ai-chat");
     const endpoints = [urvEndpoint];
-    state.profiles = [{
-      id: "urv",
-      provider: "urv",
-      baseUrl: "https://perchance.org/urv-ai-chat",
-    }];
+    state.profiles = [
+      // The normal upsert path stores id/baseUrl but leaves optional provider unset.
+      { id: "urv", baseUrl: "https://perchance.org/urv-ai-chat" },
+      // Similar-looking profiles must not be treated as the URV connection.
+      { id: "another-provider", provider: "urv", baseUrl: "https://perchance.org/urv-ai-chat" },
+      { id: "urv", baseUrl: "https://perchance.org/other-chat" },
+    ];
     expect(relayEndpoints().map((url) => url.href)).toEqual([
       "https://perchance.org/urv-ai-chat",
     ]);
