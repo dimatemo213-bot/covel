@@ -134,7 +134,11 @@ export function relayRefusal(
       endpoint.origin === target.origin &&
       `${target.pathname}/`.startsWith(basePath(endpoint)),
   );
-  const isUrv =\n    target.origin === "https://perchance.org" &&\n    target.pathname.startsWith(URV_PATH_PREFIX) &&\n    target.pathname.endsWith("/v1/chat/completions");\n  if (!configured || (!isLocalNetworkBaseUrl(target.href) && !isUrv)) {
+  const isUrv =
+    target.origin === "https://perchance.org" &&
+    target.pathname.startsWith(URV_PATH_PREFIX) &&
+    target.pathname.endsWith("/v1/chat/completions");
+  if (!configured || (!isLocalNetworkBaseUrl(target.href) && !isUrv)) {
     return `this browser relays only to the model endpoints you added in Settings on your computer or local network, and ${target.origin} is not one of them.`;
   }
   if (target.protocol === "http:" && target.hostname === "[::1]") {
