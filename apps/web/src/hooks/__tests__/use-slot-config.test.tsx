@@ -100,6 +100,30 @@ describe("useSlotConfig", () => {
     },
   );
 
+  it("treats the URV Perchance iframe provider as credential-free", () => {
+    modelSettings.slotConfig = { story: { modelRef: "urv-model" } };
+    modelSettings.customPresets = [{
+      ...preset("urv-model", "urv", "default"),
+      baseUrl: "https://perchance.org/urv-ai-chat",
+    }];
+    modelSettings.values.set("llm.slotConfig", modelSettings.slotConfig);
+    const { result } = renderHook(() => useSlotConfig([], {
+      configured: true,
+      providers: ["urv"],
+      slots: {
+        story: {
+          provider: "urv",
+          model: "default",
+          baseUrl: "https://perchance.org/urv-ai-chat",
+          protocol: "openai-chat-v1",
+          tag: "text",
+          serverKeyConfigured: false,
+        },
+      },
+    }));
+    expect(result.current.resolvedSlots[0]?.hasCredentials).toBe(true);
+  });
+
   it("does not advertise server defaults for an unresolved explicit local model", () => {
     modelSettings.slotConfig = { story: { modelRef: "missing" } };
     modelSettings.customPresets = [];
