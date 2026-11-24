@@ -62,14 +62,15 @@ export function createUrvProviderClient(
   });
   void ready.catch(() => {});
 
+  let readyTimer: number | undefined;
   const readyTimeout = window.setTimeout(() => {
     if (!infoReady) {
-      window.clearInterval(readyTimer);
+      if (readyTimer !== undefined) window.clearInterval(readyTimer);
       rejectReady(new Error("URV iframe did not become ready within 30 seconds."));
     }
   }, 30_000);
 
-  const readyTimer = window.setInterval(() => {
+  readyTimer = window.setInterval(() => {
     if (disposed || infoReady) return;
     try {
       iframe.contentWindow?.postMessage(
@@ -92,7 +93,8 @@ export function createUrvProviderClient(
     ) {
       if (!infoReady) {
         infoReady = true;
-        window.clearInterval(readyTimer);
+        if (readyTimer !== undefined) window.clearInterval(readyTimer);
+        window.clearTimeout(readyTimeout);
         resolveReady();
       }
       return;
