@@ -109,7 +109,7 @@ async function boot(): Promise<void> {
       await initSettings();
       const store = getSettings();
       // Install the browser-side Perchance connection and make it the default
-      // story/plugin model unless the player has already chosen their own.
+      // story model unless the player has already chosen their own.
       const providerProfiles =
         store.get<Array<{ id: string; name: string; provider?: string; baseUrl: string; protocol?: string; models: Array<{ ref: string; modelId: string; protocol?: string; name?: string }> }>>("llm.providers") ?? [];
       const installUrvDefaults = !providerProfiles.some((profile) => profile.id === "urv");
@@ -130,7 +130,6 @@ async function boot(): Promise<void> {
         await store.set("llm.slotConfig", {
           ...slotConfig,
           story: { modelRef: "urv/default" },
-          plugin: { modelRef: "urv/default" },
         });
       }
       // The registry applies resolved theme/scheme values through the appearance
