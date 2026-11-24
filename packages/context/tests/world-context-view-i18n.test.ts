@@ -77,6 +77,33 @@ describe("buildWorldContextView frozen dimensions", () => {
     });
   });
 
+  it("normalizes legacy all-ages ratings in the gameplay context", () => {
+    const current = buildWorldContextView({
+      worldRecord: {
+        id: "w1",
+        name: "W",
+        description: "Summary",
+        createdAt: "2026-01-01T00:00:00Z",
+      },
+      schemaMap: undefined,
+      entriesMap: undefined,
+      dimensions: {
+        tone: {
+          name: "Tone",
+          schema: { type: "object" },
+          value: { genres: ["slice-of-life"], contentRating: "all-ages" },
+          version: 1,
+        },
+      },
+      locale: "en-US",
+    });
+
+    expect(current.dimensions?.tone?.value).toMatchObject({
+      genres: ["slice-of-life"],
+      contentRating: "mature",
+    });
+  });
+
   it("projects stored values as they are, whatever the request language", () => {
     for (const locale of ["zh-CN", "ja-JP"]) {
       const projection = projectDimensionSnapshot(
