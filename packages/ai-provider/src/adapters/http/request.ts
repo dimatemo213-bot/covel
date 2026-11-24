@@ -38,7 +38,7 @@ function assertAllowedBaseUrl(
   if (!baseUrl) {
     throw new ProviderBaseUrlError("Provider error: baseUrl is required.");
   }
-  if (baseUrl.replace(/\\/$/, "") === "https://perchance.org/urv-ai-chat") {
+  if (baseUrl.replace(/\/$/, "") === "https://perchance.org/urv-ai-chat") {
     throw new ProviderBaseUrlError(
       "URV AI runs through the Perchance iframe in your Covel browser. This server has no active browser model relay for this request. Open Covel in a browser deployment with model relay enabled and keep the page open.",
     );
