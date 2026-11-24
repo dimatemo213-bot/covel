@@ -356,7 +356,7 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
   }
 }
 
-/** Only string-valued headers** Only string-valued headers survive the trip from the server. */
+/** Only string-valued headers survive the trip from the server. */
 function stringRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const result: Record<string, string> = {};
