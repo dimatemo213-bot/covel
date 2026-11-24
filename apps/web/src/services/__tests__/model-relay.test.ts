@@ -2,7 +2,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 const state = vi.hoisted(() => ({
-  profiles: [] as Array<{ baseUrl: string }>,
+  profiles: [] as Array<{ id?: string; provider?: string; baseUrl: string }>,
   relaySupported: true,
 }));
 
@@ -82,6 +82,38 @@ describe("relayRefusal", () => {
 });
 
 describe("relayEndpoints and the channel header", () => {
+  it("allows the configured URV Perchance chat and model-list paths only", () => {
+    const urvEndpoint = new URL("https://perchance.org/urv-ai-chat");
+    const endpoints = [urvEndpoint];
+    state.profiles = [{
+      id: "urv",
+      provider: "urv",
+      baseUrl: "https://perchance.org/urv-ai-chat",
+    }];
+    expect(relayEndpoints().map((url) => url.href)).toEqual([
+      "https://perchance.org/urv-ai-chat",
+    ]);
+    expect(
+      relayRefusal({
+        url: "https://perchance.org/urv-ai-chat/v1/chat/completions",
+        method: "POST",
+      }, endpoints),
+    ).toBeUndefined();
+    expect(
+      relayRefusal({
+        url: "https://perchance.org/urv-ai-chat/v1/models",
+        method: "GET",
+      }, endpoints),
+    ).toBeUndefined();
+    expect(
+      relayRefusal({
+        url: "https://perchance.org/urv-ai-chat/private",
+        method: "GET",
+      }, endpoints),
+    ).toMatch(/relays only to the model endpoints you added/);
+  });
+
+
   it("lists only the player's local endpoints and names the channel only when wanted", () => {
     state.profiles = [
       { baseUrl: "https://api.openai.com/v1" },

@@ -21,10 +21,14 @@ import { relayResponseBody } from "./model-relay-body.js";
 import { getSettings } from "@/settings/store";
 import { isModelRelaySupported } from "@/services/api/health.js";
 import { parseJsonSseData, readSseStream } from "@/services/sse.js";
+import { createUrvProviderClient, type UrvMessage } from "./urv-provider-client.js";
 
 const STREAM_URL = "/api/model-relay/stream";
 const CHANNEL_HEADER = "X-Model-Relay";
 const MAX_BACKOFF_MS = 30_000;
+const URV_BASE_URL = "https://perchance.org/urv-ai-chat";
+const URV_PATH_PREFIX = "/urv-ai-chat/";
+let urvClient: ReturnType<typeof createUrvProviderClient> | undefined;
 
 /** Request headers the browser sets itself or that would leak this page. */
 const DROPPED_REQUEST_HEADERS = new Set([
@@ -88,7 +92,11 @@ export function relayEndpoints(): URL[] {
   for (const profile of profiles) {
     const baseUrl =
       typeof profile.baseUrl === "string" ? profile.baseUrl.trim() : "";
-    if (!isLocalNetworkBaseUrl(baseUrl)) continue;
+    const isUrv =
+      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).provider === "urv" &&
+      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).id === "urv" &&
+      baseUrl.replace(/\/$/, "") === URV_BASE_URL;
+    if (!isLocalNetworkBaseUrl(baseUrl) && !isUrv) continue;
     try {
       endpoints.push(new URL(baseUrl));
     } catch {
@@ -126,7 +134,11 @@ export function relayRefusal(
       endpoint.origin === target.origin &&
       `${target.pathname}/`.startsWith(basePath(endpoint)),
   );
-  if (!configured || !isLocalNetworkBaseUrl(target.href)) {
+  const isUrv =
+    target.origin === "https://perchance.org" &&
+    (target.pathname === `${URV_PATH_PREFIX}v1/chat/completions` ||
+      target.pathname === `${URV_PATH_PREFIX}v1/models`);
+  if (!configured || (!isLocalNetworkBaseUrl(target.href) && !isUrv)) {
     return `this browser relays only to the model endpoints you added in Settings on your computer or local network, and ${target.origin} is not one of them.`;
   }
   if (target.protocol === "http:" && target.hostname === "[::1]") {
@@ -202,6 +214,104 @@ function describeFailure(error: unknown, target: URL): string {
   return `your browser could not reach ${target.origin}. Check that the model server is running and allows ${window.location.origin} through CORS, and that the browser may access your local network.`;
 }
 
+async function createUrvResponse(event: RelayRequestEvent, signal: AbortSignal): Promise<Response | undefined> {
+  const target = new URL(event.url);
+  if (
+    target.origin !== "https://perchance.org" ||
+    (target.pathname !== `${URV_PATH_PREFIX}v1/models` &&
+      target.pathname !== `${URV_PATH_PREFIX}v1/chat/completions`)
+  ) return undefined;
+
+  if (target.pathname === `${URV_PATH_PREFIX}v1/models`) {
+    return Response.json({
+      object: "list",
+      data: [{ id: "default", object: "model", owned_by: "perchance" }],
+    });
+  }
+  if (target.pathname !== `${URV_PATH_PREFIX}v1/chat/completions`) return undefined;
+
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(event.body ?? "{}") as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: { message: "Invalid URV request JSON." } }, { status: 400 });
+  }
+  if (!Array.isArray(body.messages)) {
+    return Response.json({ error: { message: "URV request requires a messages array." } }, { status: 400 });
+  }
+  const messages = body.messages.filter(
+    (message): message is UrvMessage =>
+      !!message && typeof message === "object" &&
+      typeof (message as Record<string, unknown>).role === "string" &&
+      "content" in (message as Record<string, unknown>),
+  );
+  if (messages.length !== body.messages.length) {
+    return Response.json({ error: { message: "URV received an invalid message." } }, { status: 400 });
+  }
+
+  urvClient ??= createUrvProviderClient({ iframeUrl: URV_BASE_URL });
+  const model = typeof body.model === "string" ? body.model : "default";
+  const apiKey =
+    typeof body.api_key === "string" ? body.api_key :
+    typeof body.key === "string" ? body.key : undefined;
+
+  if (body.stream === true) {
+    const encoder = new TextEncoder();
+    const requestAbort = new AbortController();
+    const abortFromRelay = () => requestAbort.abort(signal.reason);
+    signal.addEventListener("abort", abortFromRelay, { once: true });
+    const stream = new ReadableStream<Uint8Array>({
+      start(streamController) {
+        const emit = (value: unknown) => {
+          if (!requestAbort.signal.aborted) {
+            streamController.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
+          }
+        };
+        void urvClient!.chat(messages, {
+          model,
+          signal: requestAbort.signal,
+          ...(apiKey ? { apiKey } : {}),
+          onChunk: (delta) => emit({ choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] }),
+        }).then(() => {
+          if (requestAbort.signal.aborted) return;
+          emit({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
+          streamController.enqueue(encoder.encode("data: [DONE]\n\n"));
+          streamController.close();
+        }).catch((error: unknown) => {
+          if (requestAbort.signal.aborted) return;
+          emit({ error: { message: error instanceof Error ? error.message : String(error) } });
+          streamController.enqueue(encoder.encode("data: [DONE]\n\n"));
+          streamController.close();
+        }).finally(() => signal.removeEventListener("abort", abortFromRelay));
+      },
+      cancel() {
+        requestAbort.abort();
+        signal.removeEventListener("abort", abortFromRelay);
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
+    });
+  }
+
+  try {
+    const content = await urvClient.chat(messages, { model, signal, ...(apiKey ? { apiKey } : {}) });
+    return Response.json({
+      id: `urv-${Date.now()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model,
+      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+    });
+  } catch (error) {
+    return Response.json(
+      { error: { message: error instanceof Error ? error.message : String(error) } },
+      { status: 502 },
+    );
+  }
+}
+
 async function handleRequest(event: RelayRequestEvent): Promise<void> {
   const refusal = relayRefusal(event);
   if (refusal) {
@@ -212,26 +322,29 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
   const controller = new AbortController();
   inflight.set(event.id, controller);
   try {
-    const headers: Record<string, string> = {};
-    for (const [name, value] of Object.entries(event.headers ?? {})) {
-      const lower = name.toLowerCase();
-      if (DROPPED_REQUEST_HEADERS.has(lower)) continue;
-      if (lower.startsWith("proxy-") || lower.startsWith("sec-")) continue;
-      headers[name] = value;
-    }
-    const response = await fetch(target, {
-      method: event.method,
-      headers,
-      ...(event.method === "POST" && event.body !== undefined
-        ? { body: event.body }
-        : {}),
-      signal: controller.signal,
-      credentials: "omit",
-      cache: "no-store",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-      mode: "cors",
-    });
+    const urvResponse = await createUrvResponse(event, controller.signal);
+    const response = urvResponse ?? await (async () => {
+      const headers: Record<string, string> = {};
+      for (const [name, value] of Object.entries(event.headers ?? {})) {
+        const lower = name.toLowerCase();
+        if (DROPPED_REQUEST_HEADERS.has(lower)) continue;
+        if (lower.startsWith("proxy-") || lower.startsWith("sec-")) continue;
+        headers[name] = value;
+      }
+      return fetch(target, {
+        method: event.method,
+        headers,
+        ...(event.method === "POST" && event.body !== undefined
+          ? { body: event.body }
+          : {}),
+        signal: controller.signal,
+        credentials: "omit",
+        cache: "no-store",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+        mode: "cors",
+      });
+    })();
     controller.signal.throwIfAborted();
     const headOk = await post(event.id, "head", {
       json: {
@@ -243,7 +356,6 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
     if (!headOk) {
       controller.abort();
       await response.body?.cancel().catch(() => {});
-      // The server may still be waiting for this request: tell it.
       await post(event.id, "fail", {
         json: { message: "the model server's answer was refused." },
       });

@@ -14,6 +14,8 @@
 
 import { isLocalNetworkBaseUrl } from "@covel/shared";
 
+const URV_BASE_URL = "https://perchance.org/urv-ai-chat";
+
 /** One HTTP request the browser makes for the server. */
 export interface ProviderRelayRequest {
   readonly url: string;
@@ -33,5 +35,5 @@ export interface ProviderRelay {
  * local network (`isLocalNetworkBaseUrl` in `@covel/shared`).
  */
 export function isRelayableBaseUrl(baseUrl: string | undefined): boolean {
-  return isLocalNetworkBaseUrl(baseUrl);
+  return isLocalNetworkBaseUrl(baseUrl) || baseUrl?.replace(/\/$/, "") === URV_BASE_URL;
 }

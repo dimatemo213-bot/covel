@@ -4,11 +4,12 @@ import { builtinLlmToml, parseLlmConfig } from "../src/index.js";
 const storySlot = (text: string) => parseLlmConfig(text).llmConfig.covel.story;
 
 describe("builtinLlmToml", () => {
-  it("is a DeepSeek story slot without settings", () => {
+  it("uses URV AI as the default story slot", () => {
     expect(storySlot(builtinLlmToml())).toMatchObject({
-      provider: "deepseek",
-      model: "deepseek-flash",
-      baseUrl: "https://api.deepseek.com",
+      provider: "urv",
+      model: "default",
+      baseUrl: "https://perchance.org/urv-ai-chat",
+      protocol: "openai-chat-v1",
     });
   });
 

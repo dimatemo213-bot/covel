@@ -62,6 +62,7 @@ describe("isRelayableBaseUrl", () => {
     "http://[fd12:3456::1]/v1",
     "http://gateway.local:1234/v1",
     "https://box.home.arpa/v1",
+    "https://perchance.org/urv-ai-chat",
   ])("relays %s", (url) => {
     expect(isRelayableBaseUrl(url)).toBe(true);
   });
@@ -113,6 +114,27 @@ describe("relayed provider requests on a shared host", () => {
       method: "GET",
     });
     expect(requests[1]?.body).toBeUndefined();
+  });
+
+  it("routes URV Perchance chat through the browser relay on a shared host", async () => {
+    useSharedHost();
+    const { relay, requests } = recordingRelay();
+    const response = await postJson(
+      {
+        baseUrl: "https://perchance.org/urv-ai-chat",
+        relay,
+        relayable: true,
+      },
+      "/chat/completions",
+      { model: "default", messages: [{ role: "user", content: "Hi" }] },
+    );
+    expect(await response.json()).toEqual({ ok: true });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({
+      url: "https://perchance.org/urv-ai-chat/v1/chat/completions",
+      method: "POST",
+    });
+    expect(lookupMock).not.toHaveBeenCalled();
   });
 
   it("keeps public endpoints on the server's network path", async () => {
@@ -204,6 +226,14 @@ describe("which provider configs the relay may carry", () => {
       registry.resolve({
         provider: "my-gateway",
         baseUrl: "http://127.0.0.1:3425/v1",
+        requestScoped: true,
+      }).config.relayable,
+    ).toBe(true);
+    // URV is an explicit browser-side provider, not a server-owned endpoint.
+    expect(
+      registry.resolve({
+        provider: "urv",
+        baseUrl: "https://perchance.org/urv-ai-chat",
         requestScoped: true,
       }).config.relayable,
     ).toBe(true);
