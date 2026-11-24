@@ -30,7 +30,6 @@ export interface UrvProviderClient {
 }
 
 const URV_IFRAME_URL = "https://perchance.org/urv-ai-chat";
-const URV_PROVIDER_ID = "urv";
 const URV_MODEL_ID = "default";
 
 export function createUrvProviderClient(
@@ -59,7 +58,7 @@ export function createUrvProviderClient(
     rejectReady = reject;
   });
 
-  const readyTimer = window.setInterval(() => {
+  const readyTimeout = window.setTimeout(() => {\n    if (!infoReady) rejectReady(new Error("URV iframe did not become ready within 30 seconds."));\n  }, 30_000);\n\n  const readyTimer = window.setInterval(() => {
     if (disposed || infoReady) return;
     try {
       iframe.contentWindow?.postMessage(
