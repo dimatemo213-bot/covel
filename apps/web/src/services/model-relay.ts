@@ -78,6 +78,7 @@ let running = false;
 let unsupported = false;
 
 interface ProviderProfileLike {
+  readonly id?: unknown;
   readonly baseUrl?: unknown;
 }
 
@@ -92,10 +93,11 @@ export function relayEndpoints(): URL[] {
   for (const profile of profiles) {
     const baseUrl =
       typeof profile.baseUrl === "string" ? profile.baseUrl.trim() : "";
+    // ProviderModelProfile.provider is optional and is not populated by the
+    // standard upsert path. The stable profile ID plus exact URL identify URV.
     const isUrv =
-      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).provider === "urv" &&
-      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).id === "urv" &&
-      baseUrl.replace(/\/$/, "") === URV_BASE_URL;
+      profile.id === "urv" &&
+      baseUrl.replace(/\/+$/, "") === URV_BASE_URL;
     if (!isLocalNetworkBaseUrl(baseUrl) && !isUrv) continue;
     try {
       endpoints.push(new URL(baseUrl));
