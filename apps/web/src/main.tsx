@@ -112,7 +112,8 @@ async function boot(): Promise<void> {
       // story/plugin model unless the player has already chosen their own.
       const providerProfiles =
         store.get<Array<{ id: string; name: string; provider?: string; baseUrl: string; protocol?: string; models: Array<{ ref: string; modelId: string; protocol?: string; name?: string }> }>>("llm.providers") ?? [];
-      if (!providerProfiles.some((profile) => profile.id === "urv")) {
+      const installUrvDefaults = !providerProfiles.some((profile) => profile.id === "urv");
+      if (installUrvDefaults) {
         await store.set("llm.providers", [
           ...providerProfiles,
           {
@@ -124,13 +125,13 @@ async function boot(): Promise<void> {
             models: [{ ref: "urv/default", modelId: "default", protocol: "openai-chat-v1", name: "Default" }],
           },
         ]);
-      }
-      const slotConfig = store.get<Record<string, { modelRef?: string; presetId?: string }>>("llm.slotConfig") ?? {};
-      const nextSlotConfig = { ...slotConfig };
-      if (!nextSlotConfig.story) nextSlotConfig.story = { modelRef: "urv/default" };
-      if (!nextSlotConfig.plugin) nextSlotConfig.plugin = { modelRef: "urv/default" };
-      if (nextSlotConfig.story !== slotConfig.story || nextSlotConfig.plugin !== slotConfig.plugin) {
-        await store.set("llm.slotConfig", nextSlotConfig);
+        // Apply once as an initial default. Later manual model choices survive restarts.
+        const slotConfig = store.get<Record<string, { modelRef?: string; presetId?: string }>>("llm.slotConfig") ?? {};
+        await store.set("llm.slotConfig", {
+          ...slotConfig,
+          story: { modelRef: "urv/default" },
+          plugin: { modelRef: "urv/default" },
+        });
       }
       // The registry applies resolved theme/scheme values through the appearance
       // helpers, including overrides, without changing the saved preferences.
