@@ -108,6 +108,7 @@ export function createUrvProviderClient(
     if (data.type === "urv-provider:done") {
       pending.delete(data.id);
       window.clearTimeout(request.timer);
+      request.signal?.removeEventListener("abort", request.onAbort!);
       request.resolve(typeof data.text === "string" ? data.text : "");
       return;
     }
@@ -136,6 +137,7 @@ export function createUrvProviderClient(
         }
         const timer = window.setTimeout(() => {
           pending.delete(id);
+          chatOptions.signal?.removeEventListener("abort", onAbort);
           reject(new Error("URV provider request timed out."));
         }, chatOptions.timeoutMs ?? timeoutMs);
         const onAbort = () => {
