@@ -137,16 +137,17 @@ export function createUrvProviderClient(
           reject(chatOptions.signal.reason instanceof Error ? chatOptions.signal.reason : new DOMException("The operation was aborted.", "AbortError"));
           return;
         }
-        const timer = window.setTimeout(() => {
-          pending.delete(id);
-          chatOptions.signal?.removeEventListener("abort", onAbort);
-          reject(new Error("URV provider request timed out."));
-        }, chatOptions.timeoutMs ?? timeoutMs);
+        let timer: number;
         const onAbort = () => {
           pending.delete(id);
           window.clearTimeout(timer);
           reject(chatOptions.signal?.reason instanceof Error ? chatOptions.signal.reason : new DOMException("The operation was aborted.", "AbortError"));
         };
+        timer = window.setTimeout(() => {
+          pending.delete(id);
+          chatOptions.signal?.removeEventListener("abort", onAbort);
+          reject(new Error("URV provider request timed out."));
+        }, chatOptions.timeoutMs ?? timeoutMs);
         chatOptions.signal?.addEventListener("abort", onAbort, { once: true });
         pending.set(id, {
           resolve,
