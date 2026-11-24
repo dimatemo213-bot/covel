@@ -108,6 +108,30 @@ async function boot(): Promise<void> {
     try {
       await initSettings();
       const store = getSettings();
+      // Install the browser-side Perchance connection and make it the default
+      // story/plugin model unless the player has already chosen their own.
+      const providerProfiles =
+        store.get<Array<{ id: string; name: string; provider?: string; baseUrl: string; protocol?: string; models: Array<{ ref: string; modelId: string; protocol?: string; name?: string }> }>>("llm.providers") ?? [];
+      if (!providerProfiles.some((profile) => profile.id === "urv")) {
+        await store.set("llm.providers", [
+          ...providerProfiles,
+          {
+            id: "urv",
+            name: "URV AI (Perchance)",
+            provider: "urv",
+            baseUrl: "https://perchance.org/urv-ai-chat",
+            protocol: "openai-chat-v1",
+            models: [{ ref: "urv/default", modelId: "default", protocol: "openai-chat-v1", name: "Default" }],
+          },
+        ]);
+      }
+      const slotConfig = store.get<Record<string, { modelRef?: string; presetId?: string }>>("llm.slotConfig") ?? {};
+      const nextSlotConfig = { ...slotConfig };
+      if (!nextSlotConfig.story) nextSlotConfig.story = { modelRef: "urv/default" };
+      if (!nextSlotConfig.plugin) nextSlotConfig.plugin = { modelRef: "urv/default" };
+      if (nextSlotConfig.story !== slotConfig.story || nextSlotConfig.plugin !== slotConfig.plugin) {
+        await store.set("llm.slotConfig", nextSlotConfig);
+      }
       // The registry applies resolved theme/scheme values through the appearance
       // helpers, including overrides, without changing the saved preferences.
       syncThemeRegistry(store);
