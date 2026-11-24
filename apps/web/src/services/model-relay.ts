@@ -206,7 +206,7 @@ function describeFailure(error: unknown, target: URL): string {
   return `your browser could not reach ${target.origin}. Check that the model server is running and allows ${window.location.origin} through CORS, and that the browser may access your local network.`;
 }
 
-function urvResponse(event: RelayRequestEvent): Response | undefined {
+async function createUrvResponse(event: RelayRequestEvent): Promise<Response | undefined> {
   const target = new URL(event.url);
   if (
     target.origin !== "https://perchance.org" ||
@@ -244,77 +244,18 @@ function urvResponse(event: RelayRequestEvent): Response | undefined {
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const emit = (value: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\\n\\n`));
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
         void urvClient!.chat(messages, {
           model,
           ...(apiKey ? { apiKey } : {}),
           onChunk: (delta) => emit({ choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] }),
         }).then(() => {
           emit({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
-          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         }).catch((error: unknown) => {
           emit({ error: { message: error instanceof Error ? error.message : String(error) } });
-          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
-          controller.close();
-        });
-      },
-    });
-    return new Response(stream, {
-      status: 200,
-      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
-    });
-  }
-
-  return new Response(null, { status: 202, headers: { "X-URV-Pending": "1" } });
-}
-
-async function createUrvResponse(event: RelayRequestEvent): Promise<Response | undefined> {
-  const target = new URL(event.url);
-  if (
-    target.origin !== "https://perchance.org" ||
-    !target.pathname.startsWith(URV_PATH_PREFIX) ||
-    !target.pathname.endsWith("/v1/chat/completions")
-  ) return undefined;
-  let body: Record<string, unknown>;
-  try {
-    body = JSON.parse(event.body ?? "{}") as Record<string, unknown>;
-  } catch {
-    return Response.json({ error: { message: "Invalid URV request JSON." } }, { status: 400 });
-  }
-  if (!Array.isArray(body.messages)) {
-    return Response.json({ error: { message: "URV request requires a messages array." } }, { status: 400 });
-  }
-  const messages = body.messages.filter(
-    (message): message is UrvMessage =>
-      !!message && typeof message === "object" &&
-      typeof (message as Record<string, unknown>).role === "string" &&
-      "content" in (message as Record<string, unknown>),
-  );
-  if (messages.length !== body.messages.length) {
-    return Response.json({ error: { message: "URV received an invalid message." } }, { status: 400 });
-  }
-  urvClient ??= createUrvProviderClient({ iframeUrl: URV_BASE_URL });
-  const model = typeof body.model === "string" ? body.model : "default";
-  const apiKey = typeof body.api_key === "string" ? body.api_key : undefined;
-
-  if (body.stream === true) {
-    const encoder = new TextEncoder();
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const emit = (value: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\\n\\n`));
-        void urvClient!.chat(messages, {
-          model,
-          ...(apiKey ? { apiKey } : {}),
-          onChunk: (delta) => emit({ choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] }),
-        }).then(() => {
-          emit({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
-          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
-          controller.close();
-        }).catch((error: unknown) => {
-          emit({ error: { message: error instanceof Error ? error.message : String(error) } });
-          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
           controller.close();
         });
       },
@@ -352,26 +293,29 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
   const controller = new AbortController();
   inflight.set(event.id, controller);
   try {
-    const headers: Record<string, string> = {};
-    for (const [name, value] of Object.entries(event.headers ?? {})) {
-      const lower = name.toLowerCase();
-      if (DROPPED_REQUEST_HEADERS.has(lower)) continue;
-      if (lower.startsWith("proxy-") || lower.startsWith("sec-")) continue;
-      headers[name] = value;
-    }
-    const response = await fetch(target, {
-      method: event.method,
-      headers,
-      ...(event.method === "POST" && event.body !== undefined
-        ? { body: event.body }
-        : {}),
-      signal: controller.signal,
-      credentials: "omit",
-      cache: "no-store",
-      redirect: "error",
-      referrerPolicy: "no-referrer",
-      mode: "cors",
-    });
+    const urvResponse = await createUrvResponse(event);
+    const response = urvResponse ?? await (async () => {
+      const headers: Record<string, string> = {};
+      for (const [name, value] of Object.entries(event.headers ?? {})) {
+        const lower = name.toLowerCase();
+        if (DROPPED_REQUEST_HEADERS.has(lower)) continue;
+        if (lower.startsWith("proxy-") || lower.startsWith("sec-")) continue;
+        headers[name] = value;
+      }
+      return fetch(target, {
+        method: event.method,
+        headers,
+        ...(event.method === "POST" && event.body !== undefined
+          ? { body: event.body }
+          : {}),
+        signal: controller.signal,
+        credentials: "omit",
+        cache: "no-store",
+        redirect: "error",
+        referrerPolicy: "no-referrer",
+        mode: "cors",
+      });
+    })();
     controller.signal.throwIfAborted();
     const headOk = await post(event.id, "head", {
       json: {
@@ -383,7 +327,6 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
     if (!headOk) {
       controller.abort();
       await response.body?.cancel().catch(() => {});
-      // The server may still be waiting for this request: tell it.
       await post(event.id, "fail", {
         json: { message: "the model server's answer was refused." },
       });
@@ -413,7 +356,7 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
   }
 }
 
-/** Only string-valued headers survive the trip from the server. */
+/** Only string-valued headers** Only string-valued headers survive the trip from the server. */
 function stringRecord(value: unknown): Record<string, string> {
   if (!value || typeof value !== "object" || Array.isArray(value)) return {};
   const result: Record<string, string> = {};
