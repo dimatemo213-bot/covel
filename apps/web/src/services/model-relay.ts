@@ -92,7 +92,11 @@ export function relayEndpoints(): URL[] {
   for (const profile of profiles) {
     const baseUrl =
       typeof profile.baseUrl === "string" ? profile.baseUrl.trim() : "";
-    const isUrv =\n      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).provider === "urv" &&\n      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).id === "urv" &&\n      baseUrl.replace(/\\/$/, "") === URV_BASE_URL;\n    if (!isLocalNetworkBaseUrl(baseUrl) && !isUrv) continue;
+    const isUrv =
+      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).provider === "urv" &&
+      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).id === "urv" &&
+      baseUrl.replace(/\/$/, "") === URV_BASE_URL;
+    if (!isLocalNetworkBaseUrl(baseUrl) && !isUrv) continue;
     try {
       endpoints.push(new URL(baseUrl));
     } catch {
