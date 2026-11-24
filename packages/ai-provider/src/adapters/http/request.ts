@@ -38,6 +38,11 @@ function assertAllowedBaseUrl(
   if (!baseUrl) {
     throw new ProviderBaseUrlError("Provider error: baseUrl is required.");
   }
+  if (baseUrl.replace(/\\/$/, "") === "https://perchance.org/urv-ai-chat") {
+    throw new ProviderBaseUrlError(
+      "URV AI runs through the Perchance iframe in your Covel browser. This server has no active browser model relay for this request. Open Covel in a browser deployment with model relay enabled and keep the page open.",
+    );
+  }
   if (!validateBaseUrl(baseUrl)) {
     // On a shared host a player's own gateway (127.0.0.1, a LAN address) is
     // the usual cause: say why the server cannot reach it and what works.
