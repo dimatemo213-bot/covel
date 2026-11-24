@@ -3,19 +3,10 @@ import { Label } from "@/components/ui/label.js";
 import {
   inputCls,
   textareaCls,
-  selectCls,
   type TabProps,
 } from "../editor-helpers.js";
-import type { WorldTone, ContentRating } from "@covel/shared";
+import type { WorldTone } from "@covel/shared";
 import { fieldProblems } from "./field-problems.js";
-
-const CONTENT_RATINGS: ContentRating[] = ["all-ages", "teen", "mature"];
-
-const RATING_KEYS: Record<ContentRating, string> = {
-  "all-ages": "ratingAllAges",
-  teen: "ratingTeen",
-  mature: "ratingMature",
-};
 
 function splitList(value: string): string[] {
   return value
@@ -25,10 +16,12 @@ function splitList(value: string): string[] {
 }
 
 export function ToneTab({ dimensions, onChange, t, problems }: TabProps) {
-  const tone: WorldTone = dimensions.tone ?? {
-    genres: [],
-    contentRating: "teen",
-  };
+  const tone: WorldTone = dimensions.tone
+    ? { ...dimensions.tone, contentRating: "mature" }
+    : {
+        genres: [],
+        contentRating: "mature",
+      };
   const problem = fieldProblems(problems);
   // The two lists as the player types them. A field that showed the list
   // built from its text would drop a comma, or a space after a word, on the
@@ -39,7 +32,10 @@ export function ToneTab({ dimensions, onChange, t, problems }: TabProps) {
   );
 
   function setTone(next: WorldTone) {
-    onChange({ ...dimensions, tone: next });
+    onChange({
+      ...dimensions,
+      tone: { ...next, contentRating: "mature" },
+    });
   }
 
   return (
@@ -57,31 +53,6 @@ export function ToneTab({ dimensions, onChange, t, problems }: TabProps) {
           }}
         />
         {problem.at("genres")}
-      </div>
-
-      {/* Content Rating */}
-      <div className="space-y-1">
-        <Label htmlFor="world-tone-content-rating">
-          {t("world.contentRating")}
-        </Label>
-        <select
-          id="world-tone-content-rating"
-          className={`${selectCls} w-full`}
-          value={tone.contentRating}
-          onChange={(e) =>
-            setTone({
-              ...tone,
-              contentRating: e.target.value as ContentRating,
-            })
-          }
-        >
-          {CONTENT_RATINGS.map((cr) => (
-            <option key={cr} value={cr}>
-              {t(`world.${RATING_KEYS[cr]}`)}
-            </option>
-          ))}
-        </select>
-        {problem.at("contentRating")}
       </div>
 
       {/* Narrative Style */}
