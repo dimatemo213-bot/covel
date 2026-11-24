@@ -21,10 +21,14 @@ import { relayResponseBody } from "./model-relay-body.js";
 import { getSettings } from "@/settings/store";
 import { isModelRelaySupported } from "@/services/api/health.js";
 import { parseJsonSseData, readSseStream } from "@/services/sse.js";
+import { createUrvProviderClient, type UrvMessage } from "./urv-provider-client.js";
 
 const STREAM_URL = "/api/model-relay/stream";
 const CHANNEL_HEADER = "X-Model-Relay";
 const MAX_BACKOFF_MS = 30_000;
+const URV_BASE_URL = "https://perchance.org/urv-ai-chat";
+const URV_PATH_PREFIX = "/urv-ai-chat/";
+let urvClient: ReturnType<typeof createUrvProviderClient> | undefined;
 
 /** Request headers the browser sets itself or that would leak this page. */
 const DROPPED_REQUEST_HEADERS = new Set([
@@ -88,7 +92,7 @@ export function relayEndpoints(): URL[] {
   for (const profile of profiles) {
     const baseUrl =
       typeof profile.baseUrl === "string" ? profile.baseUrl.trim() : "";
-    if (!isLocalNetworkBaseUrl(baseUrl)) continue;
+    const isUrv =\n      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).provider === "urv" &&\n      (profile as ProviderProfileLike & { provider?: unknown; id?: unknown }).id === "urv" &&\n      baseUrl.replace(/\\/$/, "") === URV_BASE_URL;\n    if (!isLocalNetworkBaseUrl(baseUrl) && !isUrv) continue;
     try {
       endpoints.push(new URL(baseUrl));
     } catch {
@@ -126,7 +130,7 @@ export function relayRefusal(
       endpoint.origin === target.origin &&
       `${target.pathname}/`.startsWith(basePath(endpoint)),
   );
-  if (!configured || !isLocalNetworkBaseUrl(target.href)) {
+  const isUrv =\n    target.origin === "https://perchance.org" &&\n    target.pathname.startsWith(URV_PATH_PREFIX) &&\n    target.pathname.endsWith("/v1/chat/completions");\n  if (!configured || (!isLocalNetworkBaseUrl(target.href) && !isUrv)) {
     return `this browser relays only to the model endpoints you added in Settings on your computer or local network, and ${target.origin} is not one of them.`;
   }
   if (target.protocol === "http:" && target.hostname === "[::1]") {
@@ -200,6 +204,142 @@ function describeFailure(error: unknown, target: URL): string {
     return "the request was cancelled.";
   }
   return `your browser could not reach ${target.origin}. Check that the model server is running and allows ${window.location.origin} through CORS, and that the browser may access your local network.`;
+}
+
+function urvResponse(event: RelayRequestEvent): Response | undefined {
+  const target = new URL(event.url);
+  if (
+    target.origin !== "https://perchance.org" ||
+    !target.pathname.startsWith(URV_PATH_PREFIX) ||
+    !target.pathname.endsWith("/v1/chat/completions")
+  ) return undefined;
+
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(event.body ?? "{}") as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: { message: "Invalid URV request JSON." } }, { status: 400 });
+  }
+  if (!Array.isArray(body.messages)) {
+    return Response.json({ error: { message: "URV request requires a messages array." } }, { status: 400 });
+  }
+  const messages = body.messages.filter(
+    (message): message is UrvMessage =>
+      !!message && typeof message === "object" &&
+      typeof (message as Record<string, unknown>).role === "string" &&
+      "content" in (message as Record<string, unknown>),
+  );
+  if (messages.length !== body.messages.length) {
+    return Response.json({ error: { message: "URV received an invalid message." } }, { status: 400 });
+  }
+
+  urvClient ??= createUrvProviderClient({ iframeUrl: URV_BASE_URL });
+  const model = typeof body.model === "string" ? body.model : "default";
+  const apiKey =
+    typeof body.api_key === "string" ? body.api_key :
+    typeof body.key === "string" ? body.key : undefined;
+
+  if (body.stream === true) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const emit = (value: unknown) =>
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\\n\\n`));
+        void urvClient!.chat(messages, {
+          model,
+          ...(apiKey ? { apiKey } : {}),
+          onChunk: (delta) => emit({ choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] }),
+        }).then(() => {
+          emit({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
+          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.close();
+        }).catch((error: unknown) => {
+          emit({ error: { message: error instanceof Error ? error.message : String(error) } });
+          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.close();
+        });
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
+    });
+  }
+
+  return new Response(null, { status: 202, headers: { "X-URV-Pending": "1" } });
+}
+
+async function createUrvResponse(event: RelayRequestEvent): Promise<Response | undefined> {
+  const target = new URL(event.url);
+  if (
+    target.origin !== "https://perchance.org" ||
+    !target.pathname.startsWith(URV_PATH_PREFIX) ||
+    !target.pathname.endsWith("/v1/chat/completions")
+  ) return undefined;
+  let body: Record<string, unknown>;
+  try {
+    body = JSON.parse(event.body ?? "{}") as Record<string, unknown>;
+  } catch {
+    return Response.json({ error: { message: "Invalid URV request JSON." } }, { status: 400 });
+  }
+  if (!Array.isArray(body.messages)) {
+    return Response.json({ error: { message: "URV request requires a messages array." } }, { status: 400 });
+  }
+  const messages = body.messages.filter(
+    (message): message is UrvMessage =>
+      !!message && typeof message === "object" &&
+      typeof (message as Record<string, unknown>).role === "string" &&
+      "content" in (message as Record<string, unknown>),
+  );
+  if (messages.length !== body.messages.length) {
+    return Response.json({ error: { message: "URV received an invalid message." } }, { status: 400 });
+  }
+  urvClient ??= createUrvProviderClient({ iframeUrl: URV_BASE_URL });
+  const model = typeof body.model === "string" ? body.model : "default";
+  const apiKey = typeof body.api_key === "string" ? body.api_key : undefined;
+
+  if (body.stream === true) {
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const emit = (value: unknown) =>
+          controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\\n\\n`));
+        void urvClient!.chat(messages, {
+          model,
+          ...(apiKey ? { apiKey } : {}),
+          onChunk: (delta) => emit({ choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] }),
+        }).then(() => {
+          emit({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
+          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.close();
+        }).catch((error: unknown) => {
+          emit({ error: { message: error instanceof Error ? error.message : String(error) } });
+          controller.enqueue(encoder.encode("data: [DONE]\\n\\n"));
+          controller.close();
+        });
+      },
+    });
+    return new Response(stream, {
+      status: 200,
+      headers: { "Content-Type": "text/event-stream; charset=utf-8", "Cache-Control": "no-cache" },
+    });
+  }
+
+  try {
+    const content = await urvClient.chat(messages, { model, ...(apiKey ? { apiKey } : {}) });
+    return Response.json({
+      id: `urv-${Date.now()}`,
+      object: "chat.completion",
+      created: Math.floor(Date.now() / 1000),
+      model,
+      choices: [{ index: 0, message: { role: "assistant", content }, finish_reason: "stop" }],
+    });
+  } catch (error) {
+    return Response.json(
+      { error: { message: error instanceof Error ? error.message : String(error) } },
+      { status: 502 },
+    );
+  }
 }
 
 async function handleRequest(event: RelayRequestEvent): Promise<void> {
