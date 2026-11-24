@@ -62,6 +62,7 @@ describe("isRelayableBaseUrl", () => {
     "http://[fd12:3456::1]/v1",
     "http://gateway.local:1234/v1",
     "https://box.home.arpa/v1",
+    "https://perchance.org/urv-ai-chat",
   ])("relays %s", (url) => {
     expect(isRelayableBaseUrl(url)).toBe(true);
   });
