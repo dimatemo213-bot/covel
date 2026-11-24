@@ -214,7 +214,7 @@ function describeFailure(error: unknown, target: URL): string {
   return `your browser could not reach ${target.origin}. Check that the model server is running and allows ${window.location.origin} through CORS, and that the browser may access your local network.`;
 }
 
-async function createUrvResponse(event: RelayRequestEvent): Promise<Response | undefined> {
+async function createUrvResponse(event: RelayRequestEvent, signal: AbortSignal): Promise<Response | undefined> {
   const target = new URL(event.url);
   if (
     target.origin !== "https://perchance.org" ||
@@ -249,23 +249,36 @@ async function createUrvResponse(event: RelayRequestEvent): Promise<Response | u
 
   if (body.stream === true) {
     const encoder = new TextEncoder();
+    const requestAbort = new AbortController();
+    const abortFromRelay = () => requestAbort.abort(signal.reason);
+    signal.addEventListener("abort", abortFromRelay, { once: true });
     const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        const emit = (value: unknown) =>
-          controller.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
+      start(streamController) {
+        const emit = (value: unknown) => {
+          if (!requestAbort.signal.aborted) {
+            streamController.enqueue(encoder.encode(`data: ${JSON.stringify(value)}\n\n`));
+          }
+        };
         void urvClient!.chat(messages, {
           model,
+          signal: requestAbort.signal,
           ...(apiKey ? { apiKey } : {}),
           onChunk: (delta) => emit({ choices: [{ index: 0, delta: { content: delta }, finish_reason: null }] }),
         }).then(() => {
+          if (requestAbort.signal.aborted) return;
           emit({ choices: [{ index: 0, delta: {}, finish_reason: "stop" }] });
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
+          streamController.enqueue(encoder.encode("data: [DONE]\n\n"));
+          streamController.close();
         }).catch((error: unknown) => {
+          if (requestAbort.signal.aborted) return;
           emit({ error: { message: error instanceof Error ? error.message : String(error) } });
-          controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-          controller.close();
-        });
+          streamController.enqueue(encoder.encode("data: [DONE]\n\n"));
+          streamController.close();
+        }).finally(() => signal.removeEventListener("abort", abortFromRelay));
+      },
+      cancel() {
+        requestAbort.abort();
+        signal.removeEventListener("abort", abortFromRelay);
       },
     });
     return new Response(stream, {
@@ -275,7 +288,7 @@ async function createUrvResponse(event: RelayRequestEvent): Promise<Response | u
   }
 
   try {
-    const content = await urvClient.chat(messages, { model, ...(apiKey ? { apiKey } : {}) });
+    const content = await urvClient.chat(messages, { model, signal, ...(apiKey ? { apiKey } : {}) });
     return Response.json({
       id: `urv-${Date.now()}`,
       object: "chat.completion",
@@ -301,7 +314,7 @@ async function handleRequest(event: RelayRequestEvent): Promise<void> {
   const controller = new AbortController();
   inflight.set(event.id, controller);
   try {
-    const urvResponse = await createUrvResponse(event);
+    const urvResponse = await createUrvResponse(event, controller.signal);
     const response = urvResponse ?? await (async () => {
       const headers: Record<string, string> = {};
       for (const [name, value] of Object.entries(event.headers ?? {})) {
