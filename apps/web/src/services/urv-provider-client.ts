@@ -59,7 +59,10 @@ export function createUrvProviderClient(
   });
 
   const readyTimeout = window.setTimeout(() => {
-    if (!infoReady) rejectReady(new Error("URV iframe did not become ready within 30 seconds."));
+    if (!infoReady) {
+      window.clearInterval(readyTimer);
+      rejectReady(new Error("URV iframe did not become ready within 30 seconds."));
+    }
   }, 30_000);
 
   const readyTimer = window.setInterval(() => {
