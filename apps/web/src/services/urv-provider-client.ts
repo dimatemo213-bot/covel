@@ -15,6 +15,7 @@ export interface UrvChatOptions {
   apiKey?: string;
   timeoutMs?: number;
   onChunk?: (delta: string) => void;
+  signal?: AbortSignal;
 }
 
 interface UrvPending {
@@ -22,6 +23,8 @@ interface UrvPending {
   reject(error: Error): void;
   onChunk?: (delta: string) => void;
   timer: ReturnType<typeof setTimeout>;
+  signal?: AbortSignal;
+  onAbort?: () => void;
 }
 
 export interface UrvProviderClient {
@@ -57,6 +60,7 @@ export function createUrvProviderClient(
     resolveReady = resolve;
     rejectReady = reject;
   });
+  void ready.catch(() => {});
 
   const readyTimeout = window.setTimeout(() => {
     if (!infoReady) {
@@ -110,6 +114,7 @@ export function createUrvProviderClient(
     if (data.type === "urv-provider:error") {
       pending.delete(data.id);
       window.clearTimeout(request.timer);
+      request.signal?.removeEventListener("abort", request.onAbort!);
       request.reject(
         new Error(
           typeof data.error === "string" ? data.error : "URV provider error",
@@ -125,15 +130,27 @@ export function createUrvProviderClient(
       await ready;
       return new Promise<string>((resolve, reject) => {
         const id = `r${++sequence}_${crypto.randomUUID()}`;
+        if (chatOptions.signal?.aborted) {
+          reject(chatOptions.signal.reason instanceof Error ? chatOptions.signal.reason : new DOMException("The operation was aborted.", "AbortError"));
+          return;
+        }
         const timer = window.setTimeout(() => {
           pending.delete(id);
           reject(new Error("URV provider request timed out."));
         }, chatOptions.timeoutMs ?? timeoutMs);
+        const onAbort = () => {
+          pending.delete(id);
+          window.clearTimeout(timer);
+          reject(chatOptions.signal?.reason instanceof Error ? chatOptions.signal.reason : new DOMException("The operation was aborted.", "AbortError"));
+        };
+        chatOptions.signal?.addEventListener("abort", onAbort, { once: true });
         pending.set(id, {
           resolve,
           reject,
           onChunk: chatOptions.onChunk,
           timer,
+          signal: chatOptions.signal,
+          onAbort,
         });
         try {
           iframe.contentWindow?.postMessage(
@@ -150,6 +167,7 @@ export function createUrvProviderClient(
         } catch (error) {
           pending.delete(id);
           window.clearTimeout(timer);
+          chatOptions.signal?.removeEventListener("abort", onAbort);
           reject(error instanceof Error ? error : new Error(String(error)));
         }
       });
@@ -163,6 +181,7 @@ export function createUrvProviderClient(
       const error = new Error("URV provider client disposed.");
       for (const request of pending.values()) {
         window.clearTimeout(request.timer);
+        request.signal?.removeEventListener("abort", request.onAbort!);
         request.reject(error);
       }
       pending.clear();
