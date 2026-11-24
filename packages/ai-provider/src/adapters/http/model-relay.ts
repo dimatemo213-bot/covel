@@ -35,5 +35,5 @@ export interface ProviderRelay {
  * local network (`isLocalNetworkBaseUrl` in `@covel/shared`).
  */
 export function isRelayableBaseUrl(baseUrl: string | undefined): boolean {
-  return isLocalNetworkBaseUrl(baseUrl) || baseUrl?.replace(/\\/$/, "") === URV_BASE_URL;
+  return isLocalNetworkBaseUrl(baseUrl) || baseUrl?.replace(/\/$/, "") === URV_BASE_URL;
 }
