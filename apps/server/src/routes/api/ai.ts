@@ -900,7 +900,12 @@ aiRoutes.post(
  */
 aiRoutes.post(
   "/revise-world-description",
-  requireWorldGeneration,
+  async (c, next) => {
+    const denied =
+      requireAccess(c, "world.generate") ?? requireAccess(c, "world.write");
+    if (denied) return denied;
+    await next();
+  },
   rateLimiter({ max: 20 }),
   async (c) => {
     const parsed = await readJsonBody<Record<string, unknown>>(c);
