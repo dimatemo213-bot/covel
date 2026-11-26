@@ -63,6 +63,7 @@ interface WorldEditorProps {
 interface TabDef {
   id: string;
   labelKey: string;
+  label?: string;
   icon: React.ReactNode;
 }
 
@@ -70,6 +71,7 @@ const TABS: TabDef[] = [
   {
     id: "general",
     labelKey: "world.general",
+    label: "General",
     icon: <FileText className="h-4 w-4" />,
   },
   {
@@ -367,7 +369,7 @@ export function WorldEditor({
     <div className="h-full overflow-hidden bg-background p-3 sm:p-5 md:p-8">
       <Card className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden">
         <CardHeader className="sticky top-0 z-10 flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-border bg-card pb-4">
-          <CardTitle>{t("world.dimensions")}</CardTitle>
+          <CardTitle>{t("world.editTitle", "Edit world")}</CardTitle>
           <div className="flex items-center gap-2">
             {(blocked || error) && (
               <span role="alert" className="text-sm text-destructive">
@@ -406,7 +408,7 @@ export function WorldEditor({
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    aria-label={t(tab.labelKey)}
+                    aria-label={t(tab.labelKey, { defaultValue: tab.label ?? tab.labelKey })}
                     className="shrink-0 gap-1.5"
                   >
                     {tab.icon}
