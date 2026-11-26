@@ -26,6 +26,7 @@ import { worldPackageInfo } from "@/lib/package-info.js";
 import { PackageCredits } from "@/components/shared/package-credits.js";
 import { DimensionValueView } from "@/components/session/dimension-value-view.js";
 import { WorldGallerySection } from "./world-gallery.js";
+import { WorldDescriptionEditor } from "./world-description-editor.js";
 import { WorldRevisePanel, isWorldRevisable } from "./world-revise-panel.js";
 import {
   WorldTranslatePanel,
@@ -179,6 +180,15 @@ export function WorldDetailView({
           <p className="max-w-3xl text-base leading-relaxed text-muted-foreground wrap-break-word">
             {shown.description}
           </p>
+        )}
+
+        {full && onRevised && (
+          <WorldDescriptionEditor
+            world={full}
+            description={full.description ?? ""}
+            canUseAi={isWorldRevisable(full)}
+            onUpdated={onRevised}
+          />
         )}
 
         <PackageCredits
