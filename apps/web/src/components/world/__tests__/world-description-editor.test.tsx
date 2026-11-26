@@ -73,6 +73,6 @@ describe("WorldDescriptionEditor", () => {
         onUpdated={vi.fn()}
       />,
     );
-    expect(screen.getByLabelText("How to change the description with AI")).toBeTruthy();
+    expect(screen.getByLabelText("Как изменить описание с ИИ")).toBeTruthy();
   });
 });
