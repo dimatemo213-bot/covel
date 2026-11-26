@@ -326,6 +326,44 @@ describe("WorldEditor unsaved changes", () => {
     expect(onSave.mock.calls[0]?.[0].metadata).toEqual(world.metadata);
   });
 
+
+  it("saves the world's name, description, lore and tags alongside its dimensions", async () => {
+    const { onSave } = openEditor();
+    mocks.updateWorld.mockImplementation(
+      async (_id: string, patch: Partial<WorldRecord>) => ({
+        ...world,
+        ...patch,
+      }),
+    );
+    fireEvent.mouseDown(screen.getByRole("tab", { name: "General" }), {
+      button: 0,
+      ctrlKey: false,
+    });
+    fireEvent.change(screen.getByLabelText("World name"), {
+      target: { value: "The Harbor" },
+    });
+    fireEvent.change(screen.getByLabelText("Short description"), {
+      target: { value: "A world of islands and trade." },
+    });
+    fireEvent.change(screen.getByLabelText("World lore"), {
+      target: { value: "The sea covers most of the world." },
+    });
+    fireEvent.change(screen.getByLabelText("Tags"), {
+      target: { value: "fantasy\\nnaval" },
+    });
+    fireEvent.click(
+      screen.getByRole("button", { name: i18n.t("common.save") }),
+    );
+    await waitFor(() => expect(onSave).toHaveBeenCalledOnce());
+    expect(mocks.updateWorld).toHaveBeenCalledWith("draft-world", {
+      name: "The Harbor",
+      description: "A world of islands and trade.",
+      lore: "The sea covers most of the world.",
+      tags: ["fantasy", "naval"],
+      dimensions: world.dimensions,
+    });
+  });
+
   it("cancels immediately and permits reload when untouched", () => {
     const { onCancel } = openEditor();
     expect(unload()).toBe(false);
