@@ -41,7 +41,7 @@ describe("WorldDescriptionEditor", () => {
       />,
     );
 
-    fireEvent.change(screen.getByRole("textbox", { name: "Description" }), {
+    fireEvent.change(screen.getByRole("textbox", { name: "Описание" }), {
       target: { value: updated.description },
     });
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
@@ -63,7 +63,7 @@ describe("WorldDescriptionEditor", () => {
         onUpdated={vi.fn()}
       />,
     );
-    expect(screen.queryByLabelText("How to change the description with AI")).toBeNull();
+    expect(screen.queryByLabelText("Как изменить описание с ИИ")).toBeNull();
 
     rerender(
       <WorldDescriptionEditor
