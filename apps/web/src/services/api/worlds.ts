@@ -406,6 +406,24 @@ export function generateWorld(
  * `world` is the record of a world that only this browser holds: the server
  * revises it and stores nothing.
  */
+/** Ask the model to rewrite only a world's public description. */
+export async function reviseWorldDescription(
+  world: WorldRecord,
+  instruction: string,
+  signal?: AbortSignal,
+): Promise<string> {
+  const result = await request<{ description: string }>(
+    "/api/ai/revise-world-description",
+    {
+      method: "POST",
+      body: JSON.stringify({ world, instruction }),
+      signal,
+      operatorAuth: true,
+    },
+  );
+  return result.description;
+}
+
 export function reviseWorld(
   worldId: string,
   instruction: string,

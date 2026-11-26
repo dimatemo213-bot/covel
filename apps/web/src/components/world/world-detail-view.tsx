@@ -186,7 +186,6 @@ export function WorldDetailView({
           <WorldDescriptionEditor
             world={full}
             description={full.description ?? ""}
-            canUseAi={isWorldRevisable(full)}
             onUpdated={onRevised}
           />
         )}

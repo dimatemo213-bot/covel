@@ -4,11 +4,11 @@ import i18n from "@/i18n";
 import type { WorldRecord } from "@/services/api.js";
 
 const dataService = vi.hoisted(() => ({ updateWorld: vi.fn() }));
+const api = vi.hoisted(() => ({ reviseWorldDescription: vi.fn() }));
 vi.mock("@/services/data-service.js", () => ({
   getDataService: vi.fn(() => dataService),
-  getStorageMode: vi.fn(() => "server"),
 }));
-vi.mock("@/services/api.js", () => ({ reviseWorld: vi.fn() }));
+vi.mock("@/services/api.js", () => api);
 
 const { WorldDescriptionEditor } = await import("../world-description-editor.js");
 
@@ -23,6 +23,7 @@ const world = {
 beforeEach(async () => {
   await i18n.changeLanguage("en-US");
   dataService.updateWorld.mockReset();
+  api.reviseWorldDescription.mockReset();
 });
 
 afterEach(() => cleanup());
@@ -36,7 +37,6 @@ describe("WorldDescriptionEditor", () => {
       <WorldDescriptionEditor
         world={world}
         description={world.description}
-        canUseAi={false}
         onUpdated={onUpdated}
       />,
     );
@@ -54,25 +54,36 @@ describe("WorldDescriptionEditor", () => {
     await waitFor(() => expect(onUpdated).toHaveBeenCalledWith(updated));
   });
 
-  it("shows the AI editing controls only when AI revision is available", () => {
-    const { rerender } = render(
+  it("uses AI to revise and persist only the public description", async () => {
+    const updated = { ...world, description: "A city of clocks ruled by makers." };
+    api.reviseWorldDescription.mockResolvedValue(updated.description);
+    dataService.updateWorld.mockResolvedValue(updated);
+    const onUpdated = vi.fn();
+    render(
       <WorldDescriptionEditor
         world={world}
         description={world.description}
-        canUseAi={false}
-        onUpdated={vi.fn()}
+        onUpdated={onUpdated}
       />,
     );
-    expect(screen.queryByLabelText("Как изменить описание с ИИ")).toBeNull();
 
-    rerender(
-      <WorldDescriptionEditor
-        world={world}
-        description={world.description}
-        canUseAi
-        onUpdated={vi.fn()}
-      />,
+    fireEvent.change(screen.getByRole("textbox", { name: "Как изменить описание с ИИ" }), {
+      target: { value: "Добавь сведения о часовщиках." },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Изменить с помощью ИИ" }));
+
+    await waitFor(() =>
+      expect(api.reviseWorldDescription).toHaveBeenCalledWith(
+        world,
+        "Добавь сведения о часовщиках.",
+        expect.any(AbortSignal),
+      ),
     );
-    expect(screen.getByLabelText("Как изменить описание с ИИ")).toBeTruthy();
+    await waitFor(() =>
+      expect(dataService.updateWorld).toHaveBeenCalledWith("clockwork", {
+        description: updated.description,
+      }),
+    );
+    expect(onUpdated).toHaveBeenCalledWith(updated);
   });
 });

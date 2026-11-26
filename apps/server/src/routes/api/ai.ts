@@ -890,3 +890,84 @@ aiRoutes.post(
     );
   },
 );
+
+
+/**
+ * Revise only the short public description. This deliberately does not use
+ * the package revision pipeline: imported, hand-authored and generated worlds
+ * all share the same description field, and none of their other files/data
+ * should be rewritten for this small edit.
+ */
+aiRoutes.post(
+  "/revise-world-description",
+  async (c, next) => {
+    const denied =
+      requireAccess(c, "world.generate") ?? requireAccess(c, "world.write");
+    if (denied) return denied;
+    await next();
+  },
+  rateLimiter({ max: 20 }),
+  async (c) => {
+    const parsed = await readJsonBody<Record<string, unknown>>(c);
+    if (parsed instanceof Response) return parsed;
+    const body = parsed.body;
+    const instruction = body.instruction;
+    if (typeof instruction !== "string" || !instruction.trim()) {
+      return c.json(errorBody("instruction (string) is required"), 400);
+    }
+    if (instruction.length > 2000) {
+      return c.json(errorBody("instruction must be 2000 characters or fewer"), 400);
+    }
+    const parsedWorld = worldWireRecordSchema.safeParse(body.world);
+    if (!parsedWorld.success) {
+      return c.json(errorBody("world must be a valid WorldRecord"), 400);
+    }
+
+    const world = parsedWorld.data;
+    const locale = normalizeLocale(world.locale, DEFAULT_LOCALE);
+    const currentDescription =
+      resolveI18nText(world.description, locale) ?? "";
+    const llm = c.get("llmAdapter");
+    const signal = requestAbortSignal(c);
+
+    try {
+      const response = await llm.generate({
+        model: typeof body.model === "string" ? body.model : undefined,
+        locale,
+        signal,
+        maxOutputTokens: 1200,
+        messages: [
+          {
+            role: "system",
+            content:
+              "You are an editor for the short public description of a fictional RPG world. " +
+              "Return only the revised description as plain text. Do not include a title, " +
+              "Markdown fences, explanations, or commentary. Preserve established facts. " +
+              "Do not invent unrelated lore or change the world's canon. Apply only the " +
+              "user's requested changes. Keep the result concise and suitable for a world card.",
+          },
+          {
+            role: "user",
+            content:
+              "World name: " + resolveI18nText(world.name, locale) + "\n" +
+              "Current public description:\n<description>\n" +
+              currentDescription +
+              "\n</description>\n\nRequested edit:\n" + instruction.trim(),
+          },
+        ],
+      });
+      const description = response.content?.trim();
+      if (!description) {
+        return c.json(errorBody("The model returned an empty description"), 502);
+      }
+      if (description.length > 4000) {
+        return c.json(errorBody("The revised description exceeds 4000 characters"), 502);
+      }
+      return c.json({ description });
+    } catch (err) {
+      if (signal.aborted) throw err;
+      console.error("[ai/revise-world-description] failed:", err);
+      return c.json(errorBody("AI description editing failed"), 502);
+    }
+  },
+);
