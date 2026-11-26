@@ -178,6 +178,9 @@ export function WorldDescriptionEditor({
               : t("common.save", "Сохранить")}
           </Button>
         </div>
+        {error && phase === "idle" && (
+          <p role="alert" className="text-xs text-destructive">{error}</p>
+        )}
       </div>
 
       {canUseAi && (
@@ -198,6 +201,11 @@ export function WorldDescriptionEditor({
             )}
             className="w-full resize-y rounded-(--radius-control) border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary disabled:opacity-60"
           />
+          {draft !== description && (
+            <p className="text-xs text-muted-foreground">
+              {t("world.descriptionAiSaveFirst", "Сначала сохраните ручные изменения, затем запускайте ИИ.")}
+            </p>
+          )}
           <div className="flex justify-end gap-2">
             {working && (
               <Button size="sm" variant="ghost" onClick={cancelAi}>
@@ -207,7 +215,7 @@ export function WorldDescriptionEditor({
             <Button
               size="sm"
               variant="outline"
-              disabled={working || saving || !instruction.trim()}
+              disabled={working || saving || !instruction.trim() || draft !== description}
               onClick={improveWithAi}
             >
               <Sparkles className="mr-1.5 h-4 w-4" />
