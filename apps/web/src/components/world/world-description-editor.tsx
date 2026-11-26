@@ -71,7 +71,7 @@ export function WorldDescriptionEditor({
     setPhase("idle");
   }
 
-  function improveWithAi() {
+  async function improveWithAi() {
     const request = instruction.trim();
     if (!request || working || saving) return;
     const run = ++runRef.current;
