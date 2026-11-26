@@ -2,8 +2,8 @@ import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Save, Sparkles, Wand2 } from "lucide-react";
 import * as api from "@/services/api.js";
-import type { GenerateWorldEvent, WorldRecord } from "@/services/api.js";
-import { getDataService, getStorageMode } from "@/services/data-service.js";
+import type { WorldRecord } from "@/services/api.js";
+import { getDataService } from "@/services/data-service.js";
 import { Button } from "@/components/ui/button.js";
 import {
   WorldGenerationStatus,
@@ -13,7 +13,6 @@ import {
 interface WorldDescriptionEditorProps {
   world: WorldRecord;
   description: string;
-  canUseAi: boolean;
   onUpdated: (world: WorldRecord) => void;
 }
 
@@ -23,7 +22,6 @@ const MAX_INSTRUCTION_LENGTH = 2000;
 export function WorldDescriptionEditor({
   world,
   description,
-  canUseAi,
   onUpdated,
 }: WorldDescriptionEditorProps) {
   const { t } = useTranslation();
@@ -75,58 +73,35 @@ export function WorldDescriptionEditor({
 
   function improveWithAi() {
     const request = instruction.trim();
-    if (!request || working || saving || !canUseAi) return;
+    if (!request || working || saving) return;
     const run = ++runRef.current;
-    const local = getStorageMode() === "local";
-    const expectedWorld = structuredClone(world);
     setPhase("generating");
     setError(null);
-    const fail = (message: string) => {
+    const controller = new AbortController();
+    abortRef.current = controller;
+    try {
+      const revisedDescription = await api.reviseWorldDescription(
+        world,
+        request,
+        controller.signal,
+      );
+      if (run !== runRef.current) return;
+      setPhase("saving");
+      const updated = await getDataService().updateWorld(world.id, {
+        description: revisedDescription,
+      });
       if (run !== runRef.current) return;
       abortRef.current = null;
+      setPhase("done");
+      setInstruction("");
+      setDraft(updated.description ?? "");
+      onUpdated(updated);
+    } catch (err) {
+      if (run !== runRef.current || controller.signal.aborted) return;
+      abortRef.current = null;
       setPhase("error");
-      setError(message);
-    };
-    const prompt =
-      "Edit only the world's short public description. Keep it concise and " +
-      "accurate to the existing world. Follow this request: " +
-      request +
-      " Preserve the world's lore, history, characters, factions, mechanics, " +
-      "dimensions, and all other world data; do not invent unrelated changes.";
-    abortRef.current = api.reviseWorld(
-      world.id,
-      prompt,
-      (event: GenerateWorldEvent) => {
-        if (run !== runRef.current) return;
-        if (event.type === "progress") {
-          setPhase(event.phase);
-          return;
-        }
-        if (event.type === "error") {
-          fail(event.message);
-          return;
-        }
-        void (async () => {
-          try {
-            const revised = local
-              ? await getDataService().saveGeneratedWorld(event.world, {
-                  expectedWorld,
-                })
-              : event.world;
-            if (run !== runRef.current) return;
-            abortRef.current = null;
-            setPhase("done");
-            setInstruction("");
-            setDraft(revised.description ?? "");
-            onUpdated(revised);
-          } catch (err) {
-            fail(err instanceof Error ? err.message : String(err));
-          }
-        })();
-      },
-      (err) => fail(err.message),
-      local ? { world: expectedWorld } : undefined,
-    );
+      setError(err instanceof Error ? err.message : String(err));
+    }
   }
 
   return (
@@ -183,7 +158,7 @@ export function WorldDescriptionEditor({
         )}
       </div>
 
-      {canUseAi && (
+      {(
         <div className="space-y-2 border-t border-border pt-4">
           <label htmlFor="world-description-ai" className="text-sm font-medium">
             {t("world.descriptionAiInstruction", "Как изменить описание с ИИ")}
@@ -234,14 +209,6 @@ export function WorldDescriptionEditor({
             )}
           />
         </div>
-      )}
-      {!canUseAi && (
-        <p className="border-t border-border pt-3 text-xs text-muted-foreground">
-          {t(
-            "world.descriptionAiUnavailable",
-            "ИИ-редактирование доступно для миров, созданных генератором Covel. Описание можно изменить вручную.",
-          )}
-        </p>
       )}
     </section>
   );
