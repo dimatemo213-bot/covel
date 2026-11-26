@@ -12,6 +12,7 @@ import {
   Palette,
   Gamepad2,
   Flag,
+  FileText,
   Save,
   X,
 } from "lucide-react";
@@ -62,10 +63,17 @@ interface WorldEditorProps {
 interface TabDef {
   id: string;
   labelKey: string;
+  label?: string;
   icon: React.ReactNode;
 }
 
 const TABS: TabDef[] = [
+  {
+    id: "general",
+    labelKey: "world.general",
+    label: "General",
+    icon: <FileText className="h-4 w-4" />,
+  },
   {
     id: "definitions",
     labelKey: "world.dimensionDefinitions",
@@ -178,6 +186,12 @@ export function WorldEditor({
 }: WorldEditorProps) {
   const { t } = useTranslation();
   // The definitions as loaded, or as the JSON editor last applied them.
+  const [general, setGeneral] = useState(() => ({
+    name: world.name,
+    description: world.description ?? "",
+    lore: world.lore ?? "",
+    tags: (world.tags ?? []).join("\n"),
+  }));
   const [dimensions, setDimensions] = useState<WorldDimensions>(() =>
     structuredClone(world.dimensions ?? {}),
   );
@@ -188,7 +202,7 @@ export function WorldEditor({
   );
   // Keep incomplete form values and unapplied JSON in the dirty check.
   // Merged definitions alone can omit an unnamed or duplicate resource row.
-  const snapshot = JSON.stringify({ dimensions, drafts });
+  const snapshot = JSON.stringify({ dimensions, drafts, general });
   const [savedSnapshot, setSavedSnapshot] = useState(snapshot);
   const [jsonDrafts, setJsonDrafts] = useState<
     Record<string, { value: string; original: string }>
@@ -273,6 +287,11 @@ export function WorldEditor({
   };
 
   async function handleSave() {
+    if (!general.name.trim()) {
+      setError(t("world.nameRequired", "World name is required."));
+      setActiveTab("general");
+      return;
+    }
     const found = dimensionProblems(merged, drafts, t);
     const problemTab = TABS.find((tab) => found.tabs[tab.id]);
     if (problemTab || found.other.length > 0) {
@@ -286,6 +305,13 @@ export function WorldEditor({
     setError(null);
     try {
       const updated = await getDataService().updateWorld(world.id, {
+        name: general.name.trim(),
+        description: general.description,
+        lore: general.lore,
+        tags: general.tags
+          .split("\n")
+          .map((tag) => tag.trim())
+          .filter(Boolean),
         dimensions: merged,
       });
       setSavedSnapshot(snapshot);
@@ -343,7 +369,7 @@ export function WorldEditor({
     <div className="h-full overflow-hidden bg-background p-3 sm:p-5 md:p-8">
       <Card className="mx-auto flex h-full max-w-6xl flex-col overflow-hidden">
         <CardHeader className="sticky top-0 z-10 flex-row flex-wrap items-center justify-between gap-3 space-y-0 border-b border-border bg-card pb-4">
-          <CardTitle>{t("world.dimensions")}</CardTitle>
+          <CardTitle>{t("world.editTitle", "Edit world")}</CardTitle>
           <div className="flex items-center gap-2">
             {(blocked || error) && (
               <span role="alert" className="text-sm text-destructive">
@@ -382,7 +408,7 @@ export function WorldEditor({
                   <TabsTrigger
                     key={tab.id}
                     value={tab.id}
-                    aria-label={t(tab.labelKey)}
+                    aria-label={t(tab.labelKey, { defaultValue: tab.label ?? tab.labelKey })}
                     className="shrink-0 gap-1.5"
                   >
                     {tab.icon}
@@ -401,6 +427,77 @@ export function WorldEditor({
 
               <div className="mt-4 min-h-0 flex-1 overflow-y-auto overscroll-contain">
                 {TABS.map((tab) => {
+                  if (tab.id === "general") {
+                    return (
+                      <TabsContent value="general" key="general">
+                        <div className="mx-auto max-w-3xl space-y-5">
+                          <div className="space-y-2">
+                            <label htmlFor="world-name" className="text-sm font-medium">
+                              {t("world.name", "World name")}
+                            </label>
+                            <input
+                              id="world-name"
+                              value={general.name}
+                              maxLength={160}
+                              onChange={(event) =>
+                                setGeneral((current) => ({ ...current, name: event.target.value }))
+                              }
+                              className="w-full rounded-(--radius-control) border border-border bg-background px-3 py-2 text-sm outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="world-description" className="text-sm font-medium">
+                              {t("world.description", "Short description")}
+                            </label>
+                            <textarea
+                              id="world-description"
+                              value={general.description}
+                              maxLength={4000}
+                              rows={4}
+                              onChange={(event) =>
+                                setGeneral((current) => ({ ...current, description: event.target.value }))
+                              }
+                              className="w-full resize-y rounded-(--radius-control) border border-border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary"
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="world-lore" className="text-sm font-medium">
+                              {t("world.lore", "World lore")}
+                            </label>
+                            <textarea
+                              id="world-lore"
+                              value={general.lore}
+                              rows={10}
+                              onChange={(event) =>
+                                setGeneral((current) => ({ ...current, lore: event.target.value }))
+                              }
+                              className="w-full resize-y rounded-(--radius-control) border border-border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {t("world.loreEditHint", "This changes the saved world record. It does not rewrite the original package files.")}
+                            </p>
+                          </div>
+                          <div className="space-y-2">
+                            <label htmlFor="world-tags" className="text-sm font-medium">
+                              {t("world.tags", "Tags")}
+                            </label>
+                            <textarea
+                              id="world-tags"
+                              value={general.tags}
+                              rows={3}
+                              onChange={(event) =>
+                                setGeneral((current) => ({ ...current, tags: event.target.value }))
+                              }
+                              className="w-full resize-y rounded-(--radius-control) border border-border bg-background px-3 py-2 text-sm leading-relaxed outline-none focus:border-primary"
+                            />
+                            <p className="text-xs text-muted-foreground">
+                              {t("world.tagsEditHint", "Enter one tag per line.")}
+                            </p>
+                          </div>
+                        </div>
+                      </TabsContent>
+                    );
+                  }
                   const id = tab.id as keyof typeof templateComponents;
                   const Component =
                     tab.id === "definitions"
