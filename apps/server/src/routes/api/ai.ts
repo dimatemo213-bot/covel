@@ -955,6 +955,9 @@ aiRoutes.post(
       if (!description) {
         return c.json(errorBody("The model returned an empty description"), 502);
       }
+      if (description.length > 4000) {
+        return c.json(errorBody("The revised description exceeds 4000 characters"), 502);
+      }
       return c.json({ description });
     } catch (err) {
       if (signal.aborted) throw err;
