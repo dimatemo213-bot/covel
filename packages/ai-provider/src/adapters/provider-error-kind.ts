@@ -86,17 +86,6 @@ export function accountFailureKind(
 ): "quota" | "auth" | undefined {
   if (statusCode === undefined) return undefined;
   if (statusCode === 402) return "quota";
-  // AI Horde uses HTTP 403 for worker-capacity/KudosUpfront refusals too.
-  // These are not credential failures: eligible workers cannot accept the
-  // requested context/output budget without Kudos held upfront.
-  if (
-    statusCode === 403 &&
-    typeof details?.message === "string" &&
-    /(?:workers? eligible .* serve up to .* tokens?.*kudos held upfront|kudosupfront|request needs [\\d,.]+ kudos)/i.test(
-      details.message,
-    )
-  )
-    return "quota";
   if (
     providerErrorKind(details?.providerCode, details?.providerType) === "quota"
   )
