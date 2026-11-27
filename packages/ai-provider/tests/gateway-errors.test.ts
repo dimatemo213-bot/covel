@@ -116,6 +116,19 @@ describe("errors typed where they start", () => {
       code: "PROVIDER_ERROR",
       retriable: false,
     });
+
+    // AI Horde's worker-capacity gate is also HTTP 403, but it is not an
+    // invalid API key. Keep it classified as a quota/capacity limitation.
+    const hordeCapacity = thrown(403, {
+      message:
+        "The workers eligible for this request currently serve up to 4096 tokens without kudos held upfront. For more, the client needs to already have the required kudos. This request needs 10922.67 kudos held upfront.",
+    });
+    expect(hordeCapacity).toMatchObject({
+      code: "PROVIDER_ERROR",
+      retriable: false,
+      statusCode: 403,
+    });
+    expect(classifyProviderFailure(hordeCapacity).kind).toBe("quota");
     expect(
       thrown(401, {
         type: "authentication_error",
